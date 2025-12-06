@@ -3,12 +3,35 @@ const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:400
 
 // ==================== SISTEMA DE LOGIN ====================
 // Validar sesión al cargar la página
+document.addEventListener('DOMContentLoaded', function () {
+    verificarSesion();
+});
 
-// Mostrar nombre del cajero
-document.getElementById('nombre-cajero').innerText = usuario.charAt(0).toUpperCase() + usuario.slice(1);
+function verificarSesion() {
+    const usuarioGuardado = localStorage.getItem('cajero_usuario');
 
-// Cargar datos iniciales
-cargarClientes();
+    if (usuarioGuardado) {
+        // Ya hay sesión activa
+        mostrarAplicacion(usuarioGuardado);
+    } else {
+        // Mostrar pantalla de login
+        document.getElementById('pantalla-login').style.display = 'flex';
+        document.getElementById('app-principal').style.display = 'none';
+    }
+}
+
+// La función iniciarSesion() está al final del archivo (módulo de empleados)
+
+function mostrarAplicacion(usuario) {
+    // Ocultar login y mostrar app
+    document.getElementById('pantalla-login').style.display = 'none';
+    document.getElementById('app-principal').style.display = 'block';
+
+    // Mostrar nombre del cajero
+    document.getElementById('nombre-cajero').innerText = usuario.charAt(0).toUpperCase() + usuario.slice(1);
+
+    // Cargar datos iniciales
+    cargarClientes();
 }
 
 function cerrarSesion() {
