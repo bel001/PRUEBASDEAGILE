@@ -1,0 +1,79 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../db/firebase'); 
+const { consultarDni, consultarRuc } = require('../services/dniService');
+
+const clientesRef = db.collection('clientes');
+
+// GET /clientes
+router.get('/', async (req, res) => {
+  try {
+    const snapshot = await clientesRef.get();
+    const lista = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(lista);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /clientes/crear-desde-api
+router.post('/crear-desde-api', async (req, res) => {
+  const { tipo, documento, email, telefono } = req.body;
+
+  if (!tipo || !documento) return res.status(400).json({ error: 'Faltan datos' });
+
+  try {
+    // 1. Validar duplicados
+    const existe = await clientesRef.where('documento', '==', documento).get();
+    if (!existe.empty) {
+      return res.status(400).json({ error: 'El cliente ya existe' });
+    }
+
+    let nombre = '';
+
+    // 2. Obtener Nombre de la API
+    if (tipo === 'NATURAL') {
+      try {
+        console.log("🔍 Buscando datos en servicio DNI...");
+        const data = await consultarDni(documento);
+        
+        // CORRECCIÓN CLAVE:
+        // Usamos directamente 'data.nombre' que ya confirmamos en el log que viene lleno.
+        // Si por alguna razón falla, ponemos un texto por defecto.
+        nombre = data.nombre || "Nombre Desconocido";
+        
+        console.log("📝 Nombre final a guardar:", nombre);
+
+      } catch (apiError) {
+        console.error("⚠️ Error servicio DNI:", apiError.message);
+        nombre = `Cliente DNI ${documento} (Manual)`;
+      }
+    } else {
+       // Lógica RUC
+       try {
+         const data = await consultarRuc(documento);
+         nombre = data.razonSocial || `Empresa RUC ${documento}`;
+       } catch (e) {
+         nombre = `Empresa RUC ${documento} (Manual)`;
+       }
+    }
+
+    const nuevoCliente = {
+      tipo, 
+      nombre, 
+      documento, 
+      email: email || '', 
+      telefono: telefono || '',
+      creado_en: new Date().toISOString()
+    };
+
+    const docRef = await clientesRef.add(nuevoCliente);
+    res.json({ id: docRef.id, ...nuevoCliente, creado: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;

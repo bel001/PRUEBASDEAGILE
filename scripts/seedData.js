@@ -1,0 +1,215 @@
+// Script para poblar Firebase con datos de prueba para la exposición
+// EJECUTAR: node scripts/seedData.js
+
+const admin = require('firebase-admin');
+const serviceAccount = require('../serviceAccountKey.json');
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore();
+
+async function poblarDatos() {
+    console.log('🌱 Iniciando población de datos de prueba...\n');
+
+    try {
+        // ============================================
+        // Cliente 1: Juan Pérez - Para demostrar MORA
+        // ============================================
+        console.log('📝 Creando Cliente 1: Juan Pérez...');
+        const cliente1Ref = await db.collection('clientes').add({
+            tipo: 'NATURAL',
+            documento: '12345678',
+            nombre: 'PEREZ GARCIA JUAN CARLOS',
+            email: 'juan.perez@example.com',
+            telefono: '999888777',
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Cliente creado con ID:', cliente1Ref.id);
+
+        // Préstamo para Juan
+        const prestamo1Ref = await db.collection('prestamos').add({
+            cliente_id: cliente1Ref.id,
+            monto_total: 1000,
+            num_cuotas: 10,
+            monto_por_cuota: 100,
+            fecha_inicio: '2024-11-01',
+            cancelado: false,
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Préstamo creado con ID:', prestamo1Ref.id);
+
+        // Cuota 1: Pagada (ejemplo de cuota ya pagada)
+        await db.collection('cuotas').add({
+            prestamo_id: prestamo1Ref.id,
+            cliente_id: cliente1Ref.id,
+            numero_cuota: 1,
+            fecha_vencimiento: '2024-12-01',
+            monto_cuota: 100,
+            saldo_pendiente: 0,
+            pagada: true
+        });
+
+        // Cuota 2: Pagada
+        await db.collection('cuotas').add({
+            prestamo_id: prestamo1Ref.id,
+            cliente_id: cliente1Ref.id,
+            numero_cuota: 2,
+            fecha_vencimiento: '2024-12-31',
+            monto_cuota: 100,
+            saldo_pendiente: 0,
+            pagada: true
+        });
+
+        // Cuota 3: VENCIDA hace 30 días (para demo de mora)
+        const hace30Dias = new Date();
+        hace30Dias.setDate(hace30Dias.getDate() - 30);
+        await db.collection('cuotas').add({
+            prestamo_id: prestamo1Ref.id,
+            cliente_id: cliente1Ref.id,
+            numero_cuota: 3,
+            fecha_vencimiento: hace30Dias.toISOString().split('T')[0],
+            monto_cuota: 100,
+            saldo_pendiente: 100,
+            pagada: false
+        });
+        console.log('   ✅ Cuota VENCIDA creada (30 días de atraso)');
+
+        // Cuota 4: Pendiente (vence en 10 días)
+        const en10Dias = new Date();
+        en10Dias.setDate(en10Dias.getDate() + 10);
+        await db.collection('cuotas').add({
+            prestamo_id: prestamo1Ref.id,
+            cliente_id: cliente1Ref.id,
+            numero_cuota: 4,
+            fecha_vencimiento: en10Dias.toISOString().split('T')[0],
+            monto_cuota: 100,
+            saldo_pendiente: 100,
+            pagada: false
+        });
+
+        // Cuota 5: MONTO BAJO para demo con transferencia real (S/ 0.10)
+        const en40Dias = new Date();
+        en40Dias.setDate(en40Dias.getDate() + 40);
+        await db.collection('cuotas').add({
+            prestamo_id: prestamo1Ref.id,
+            cliente_id: cliente1Ref.id,
+            numero_cuota: 5,
+            fecha_vencimiento: en40Dias.toISOString().split('T')[0],
+            monto_cuota: 0.10,
+            saldo_pendiente: 0.10,
+            pagada: false
+        });
+        console.log('   ✅ Cuota de S/ 0.10 creada para demo con pago real\n');
+
+        // ============================================
+        // Cliente 2: María López - Para demostrar REDONDEO
+        // ============================================
+        console.log('📝 Creando Cliente 2: María López...');
+        const cliente2Ref = await db.collection('clientes').add({
+            tipo: 'NATURAL',
+            documento: '87654321',
+            nombre: 'LOPEZ MARTINEZ MARIA ELENA',
+            email: 'maria.lopez@example.com',
+            telefono: '988777666',
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Cliente creado con ID:', cliente2Ref.id);
+
+        const prestamo2Ref = await db.collection('prestamos').add({
+            cliente_id: cliente2Ref.id,
+            monto_total: 500,
+            num_cuotas: 15,
+            monto_por_cuota: 33.33,
+            fecha_inicio: new Date().toISOString().split('T')[0],
+            cancelado: false,
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Préstamo creado con ID:', prestamo2Ref.id);
+
+        // Cuota de S/ 33.33 para demostrar redondeo (33.33 -> 33.30 en efectivo)
+        const hoy = new Date();
+        await db.collection('cuotas').add({
+            prestamo_id: prestamo2Ref.id,
+            cliente_id: cliente2Ref.id,
+            numero_cuota: 1,
+            fecha_vencimiento: hoy.toISOString().split('T')[0],
+            monto_cuota: 33.33,
+            saldo_pendiente: 33.33,
+            pagada: false
+        });
+        console.log('   ✅ Cuota de S/ 33.33 creada para demo de redondeo\n');
+
+        // ============================================
+        // Cliente 3: Carlos Ruiz - Deuda vencida hace 15 días
+        // ============================================
+        console.log('📝 Creando Cliente 3: Carlos Ruiz...');
+        const cliente3Ref = await db.collection('clientes').add({
+            tipo: 'NATURAL',
+            documento: '11111111',
+            nombre: 'RUIZ SANCHEZ CARLOS ALBERTO',
+            email: 'carlos.ruiz@example.com',
+            telefono: '977666555',
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Cliente creado con ID:', cliente3Ref.id);
+
+        const prestamo3Ref = await db.collection('prestamos').add({
+            cliente_id: cliente3Ref.id,
+            monto_total: 2000,
+            num_cuotas: 20,
+            monto_por_cuota: 100,
+            fecha_inicio: '2024-11-15',
+            cancelado: false,
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Préstamo creado con ID:', prestamo3Ref.id);
+
+        // Cuota VENCIDA hace 15 días
+        const hace15Dias = new Date();
+        hace15Dias.setDate(hace15Dias.getDate() - 15);
+        await db.collection('cuotas').add({
+            prestamo_id: prestamo3Ref.id,
+            cliente_id: cliente3Ref.id,
+            numero_cuota: 1,
+            fecha_vencimiento: hace15Dias.toISOString().split('T')[0],
+            monto_cuota: 100,
+            saldo_pendiente: 100,
+            pagada: false
+        });
+        console.log('   ✅ Cuota VENCIDA creada (15 días de atraso)\n');
+
+        // ============================================
+        // RESUMEN
+        // ============================================
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('🎉 ¡Datos semilla creados exitosamente!');
+        console.log('═══════════════════════════════════════════════════════════\n');
+        console.log('📋 CLIENTES CREADOS PARA LA EXPOSICIÓN:\n');
+        console.log('1️⃣  JUAN PÉREZ (DNI: 12345678)');
+        console.log('    - Cuota #3: S/ 100.00 VENCIDA hace 30 días');
+        console.log('    - Mora esperada: S/ 1.00 (1%)');
+        console.log('    - Total a pagar: S/ 101.00');
+        console.log('    - Cuota #5: S/ 0.10 (para pago real con Yape)\n');
+        console.log('2️⃣  MARÍA LÓPEZ (DNI: 87654321)');
+        console.log('    - Cuota #1: S/ 33.33 AL DÍA');
+        console.log('    - Redondeo en efectivo: S/ 33.30');
+        console.log('    - Ajuste: -S/ 0.03\n');
+        console.log('3️⃣  CARLOS RUIZ (DNI: 11111111)');
+        console.log('    - Cuota #1: S/ 100.00 VENCIDA hace 15 días');
+        console.log('    - Mora esperada: S/ 1.00 (1%)');
+        console.log('    - Total a pagar: S/ 101.00\n');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('✅ Base de datos lista para la exposición académica');
+        console.log('═══════════════════════════════════════════════════════════\n');
+
+        process.exit(0);
+    } catch (error) {
+        console.error('\n❌ ERROR al crear datos:', error);
+        process.exit(1);
+    }
+}
+
+// Ejecutar
+poblarDatos();
