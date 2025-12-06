@@ -41,23 +41,71 @@ p {
 
 .login-card {
     background: white;
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    padding: 50px 40px;
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
     text-align: center;
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .login-card h1 {
     color: #2c3e50;
-    margin-bottom: 5px;
+    margin-bottom: 10px;
+    font-size: 2em;
 }
 
 .login-card h3 {
     color: #34495e;
-    margin: 0 0 5px 0;
-    font-weight: normal;
+    margin: 0 0 10px 0;
+    font-weight: 500;
+    font-size: 1.3em;
+}
+
+.login-card .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.login-card input {
+    width: 100%;
+    padding: 14px;
+    font-size: 1.05em;
+    border: 2px solid #e0e0e0;
+    transition: all 0.3s;
+}
+
+.login-card input:focus {
+    border-color: #667eea;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.login-card .btn-secondary {
+    font-size: 1.1em;
+    padding: 14px !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.login-card .btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
 }
 
 /* Navegación */

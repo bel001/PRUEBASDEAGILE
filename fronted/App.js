@@ -3,61 +3,12 @@ const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:400
 
 // ==================== SISTEMA DE LOGIN ====================
 // Validar sesión al cargar la página
-document.addEventListener('DOMContentLoaded', function () {
-    verificarSesion();
-});
 
-function verificarSesion() {
-    const usuarioGuardado = localStorage.getItem('cajero_usuario');
+// Mostrar nombre del cajero
+document.getElementById('nombre-cajero').innerText = usuario.charAt(0).toUpperCase() + usuario.slice(1);
 
-    if (usuarioGuardado) {
-        // Ya hay sesión activa
-        mostrarAplicacion(usuarioGuardado);
-    } else {
-        // Mostrar pantalla de login
-        document.getElementById('pantalla-login').style.display = 'flex';
-        document.getElementById('app-principal').style.display = 'none';
-    }
-}
-
-function iniciarSesion() {
-    const usuario = document.getElementById('login-usuario').value.trim();
-    const password = document.getElementById('login-password').value;
-    const mensajeDiv = document.getElementById('login-mensaje');
-
-    mensajeDiv.innerText = '';
-
-    if (!usuario || !password) {
-        mensajeDiv.innerText = '⚠️ Ingrese usuario y contraseña';
-        return;
-    }
-
-    // Validación simple (en producción sería contra el backend)
-    const usuariosValidos = {
-        'cajero': '123',
-        'admin': 'admin123',
-        'usuario': 'usuario123'
-    };
-
-    if (usuariosValidos[usuario] && usuariosValidos[usuario] === password) {
-        // Login exitoso
-        localStorage.setItem('cajero_usuario', usuario);
-        mostrarAplicacion(usuario);
-    } else {
-        mensajeDiv.innerText = '❌ Usuario o contraseña incorrectos';
-    }
-}
-
-function mostrarAplicacion(usuario) {
-    // Ocultar login y mostrar app
-    document.getElementById('pantalla-login').style.display = 'none';
-    document.getElementById('app-principal').style.display = 'block';
-
-    // Mostrar nombre del cajero
-    document.getElementById('nombre-cajero').innerText = usuario.charAt(0).toUpperCase() + usuario.slice(1);
-
-    // Cargar datos iniciales
-    cargarClientes();
+// Cargar datos iniciales
+cargarClientes();
 }
 
 function cerrarSesion() {
