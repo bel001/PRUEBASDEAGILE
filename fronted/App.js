@@ -672,6 +672,45 @@ async function procesarPago() {
 
     mensajeDiv.innerText = '⏳ Procesando pago...';
 
+    // MERCADOPAGO: Redirigir a página de pago externa
+    if (medioPago === 'MERCADOPAGO') {
+        try {
+            const mpRes = await fetch(`${API_URL}/mercadopago/crear-preferencia`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cuota_id: cuotaSeleccionada.id,
+                    monto: montoPagar,
+                    cliente_nombre: prestamoActivo.prestamo.cliente_nombre,
+                    cliente_email: prestamoActivo.prestamo.cliente_email || 'cliente@example.com'
+                })
+            });
+
+            const mpData = await mpRes.json();
+
+            if (mpRes.ok && mpData.init_point) {
+                mensajeDiv.innerHTML = `
+                    <p>🔵 Redirigiendo a MercadoPago...</p>
+                    <p style="font-size: 0.9em; color: #666;">Si no se abre automáticamente, 
+                    <a href="${mpData.init_point}" target="_blank" style="color: #3498db;">haz clic aquí</a></p>
+                `;
+                // Redirigir a MercadoPago
+                window.open(mpData.init_point, '_blank');
+                return;
+            } else {
+                mensajeDiv.innerText = `❌ Error con MercadoPago: ${mpData.error || 'Intente nuevamente'}`;
+                mensajeDiv.classList.add('error');
+                return;
+            }
+        } catch (err) {
+            console.error('Error MercadoPago:', err);
+            mensajeDiv.innerText = '❌ Error conectando con MercadoPago';
+            mensajeDiv.classList.add('error');
+            return;
+        }
+    }
+
+    // PAGO NORMAL (Efectivo, Yape, Plin, Tarjeta)
     try {
         const res = await fetch(`${API_URL}/pagos`, {
             method: 'POST',

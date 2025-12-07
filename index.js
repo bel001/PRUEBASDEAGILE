@@ -8,6 +8,7 @@ const clientesRoutes = require('./routes/clientes');
 const prestamosRoutes = require('./routes/prestamos');
 const pagosRoutes = require('./routes/pagos');
 const cajaRoutes = require('./routes/caja');
+const mercadopagoRoutes = require('./routes/mercadopago');
 
 app.use(cors());
 app.use(express.json());
@@ -17,6 +18,7 @@ app.use('/clientes', clientesRoutes);
 app.use('/prestamos', prestamosRoutes);
 app.use('/pagos', pagosRoutes);
 app.use('/caja', cajaRoutes);
+app.use('/mercadopago', mercadopagoRoutes);
 
 // Health check para Render
 app.get('/health', (req, res) => {
