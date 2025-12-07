@@ -520,15 +520,54 @@ function mostrarSeccion(seccionId) {
     document.querySelectorAll('.seccion').forEach(sec => sec.style.display = 'none');
 
     // Mostrar la sección seleccionada
-    document.getElementById(`seccion-${seccionId}`).style.display = 'block';
+    const seccion = document.getElementById(`seccion-${seccionId}`);
+    if (seccion) {
+        seccion.style.display = 'block';
+    }
 
-    // Actualizar botones activos
-    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    // Actualizar título de la página
+    const titulos = {
+        'dashboard': 'Dashboard',
+        'clientes': 'Clientes',
+        'prestamos': 'Préstamos',
+        'pagos': 'Cobranza',
+        'caja': 'Control de Caja',
+        'calendario': 'Calendario de Vencimientos',
+        'empleados': 'Empleados',
+        'config': 'Configuración del Sistema'
+    };
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) pageTitle.innerText = titulos[seccionId] || 'Dashboard';
 
-    // Cargar datos específicos si es necesario
-    if (seccionId === 'caja') {
-        cargarEstadoCaja();
+    // Actualizar botones activos en sidebar
+    document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+    // Buscar el botón que corresponde a esta sección
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        if (btn.getAttribute('onclick')?.includes(seccionId)) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Cargar datos específicos según la sección
+    switch (seccionId) {
+        case 'dashboard':
+            cargarDashboard();
+            break;
+        case 'clientes':
+            cargarClientes();
+            break;
+        case 'caja':
+            cargarEstadoCaja();
+            break;
+        case 'calendario':
+            cargarCalendario();
+            break;
+        case 'empleados':
+            cargarEmpleados();
+            break;
+        case 'config':
+            cargarConfiguracion();
+            break;
     }
 }
 
