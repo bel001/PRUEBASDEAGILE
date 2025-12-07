@@ -203,10 +203,14 @@ async function cargarClientes() {
             const row = document.createElement('tr');
 
             let extraInfo = '';
+            let btnRecordar = '';
             if (filtroMorososActivo) {
                 row.style.backgroundColor = '#fff3e0';
                 row.style.borderLeft = '4px solid #e74c3c';
                 extraInfo = `<br><span class="badge-vencida">📅 ${c.diasAtraso} días atraso</span> <span style="font-size:0.8em; color:#c0392b;">(Mora: S/ ${c.moraTotal.toFixed(2)})</span>`;
+                // Botón WhatsApp
+                const mensaje = encodeURIComponent(`Hola ${c.nombre}, le recordamos que tiene una cuota vencida hace ${c.diasAtraso} días. Su mora acumulada es S/ ${c.moraTotal.toFixed(2)}. Por favor acercarse a regularizar su pago. Gracias.`);
+                btnRecordar = `<button class="btn-small" style="background:#25D366; margin-left:5px;" onclick="window.open('https://wa.me/?text=${mensaje}', '_blank')">📱 Recordar</button>`;
             }
 
             row.innerHTML = `
@@ -218,6 +222,7 @@ async function cargarClientes() {
                 <td><span style="font-size:0.8em; padding:3px 8px; background:#eee; border-radius:10px;">${c.tipo}</span></td>
                 <td>
                     <button class="btn-small" onclick="verPrestamo('${c.id}')">Ver Préstamos</button>
+                    ${btnRecordar}
                 </td>
             `;
             lista.appendChild(row);
@@ -1210,22 +1215,24 @@ async function anularPago(pagoId) {
 
 // Función para reimpresión de comprobante
 function reimprimirComprobante(id, monto, medio) {
-    if (!clienteSeleccionado) {
-        alert('❌ Error: No hay cliente seleccionado');
+    const lista = document.getElementById('historial-lista');
+    const clienteNombre = lista.getAttribute('data-cliente-nombre');
+    const clienteDoc = lista.getAttribute('data-cliente-doc');
+
+    if (!clienteNombre) {
+        alert('❌ Error: Datos del cliente no disponibles. Recargue la página.');
         return;
     }
 
     const numCuota = document.getElementById('historial-num-cuota').innerText;
 
     // Reconstruir objeto de datos para el PDF
-    // Nota: Algunos datos como "Capital" vs "Mora" exactos del momento del pago
-    // no se guardan separados en el historial básico, así que asumiremos el total como monto pagado.
     const datoPago = {
-        cliente_nombre: clienteSeleccionado.nombre,
-        cliente_doc: clienteSeleccionado.documento,
+        cliente_nombre: clienteNombre,
+        cliente_doc: clienteDoc || 'N/A',
         numero_cuota: numCuota,
-        capital: monto, // En reimpresión, mostramos el total pagado como referencia principal
-        mora: 0,        // No tenemos el desglose histórico exacto aquí sin consultar más datos
+        capital: monto,
+        mora: 0,
         total: monto,
         medio_pago: medio,
         ajuste: 0,
@@ -1235,4 +1242,38 @@ function reimprimirComprobante(id, monto, medio) {
     if (confirm('¿Desea volver a descargar el comprobante?')) {
         generarComprobantePDF(datoPago);
     }
+}
+
+// ==================== EXPORTACIÓN A CSV ====================
+function exportarClientesCSV() {
+    const tabla = document.querySelector('.tabla-clientes');
+    if (!tabla) {
+        alert('No hay datos para exportar');
+        return;
+    }
+
+    let csv = [];
+    const filas = tabla.querySelectorAll('tr');
+
+    filas.forEach(fila => {
+        const celdas = fila.querySelectorAll('th, td');
+        const fila_csv = [];
+        celdas.forEach(celda => {
+            // Limpiar texto (quitar HTML y saltos de línea)
+            let texto = celda.innerText.replace(/"/g, '""').replace(/\n/g, ' ').trim();
+            fila_csv.push(`"${texto}"`);
+        });
+        csv.push(fila_csv.join(','));
+    });
+
+    const contenido = csv.join('\n');
+    const blob = new Blob(['\ufeff' + contenido], { type: 'text/csv;charset=utf-8;' }); // BOM para Excel
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `clientes_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+
+    mostrarToast('📄 Archivo CSV descargado', 'success');
 }
