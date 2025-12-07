@@ -58,7 +58,9 @@ router.post('/', async (req, res) => {
 
     // 4. Generar Cuotas
     for (let i = 1; i <= num_cuotas; i++) {
-      fecha.setDate(fecha.getDate() + 30); // Sumar 30 días
+      // Usar setMonth para sumar meses reales (28, 30, 31 días)
+      // Esto respeta el calendario real
+      fecha.setMonth(fecha.getMonth() + 1);
       const fecha_vencimiento = fecha.toISOString().split('T')[0];
 
       const cuotaRef = db.collection('cuotas').doc(); // ID automático
