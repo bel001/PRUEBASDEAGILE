@@ -1567,6 +1567,56 @@ body.dark-mode .card-body {
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
+/* CRITICAL: Force dark text on light backgrounds in dark mode */
+body.dark-mode tr[style*="background"] td,
+body.dark-mode tr[style*="background-color"] td,
+body.dark-mode tr[style*="#fff"] td,
+body.dark-mode tr[style*="rgb(255"] td {
+    color: #1a202c !important;
+}
+
+body.dark-mode tr[style*="background"] td *,
+body.dark-mode tr[style*="background-color"] td * {
+    color: #1a202c !important;
+}
+
+/* Light background result containers */
+body.dark-mode div[style*="background: #e"],
+body.dark-mode div[style*="background:#e"],
+body.dark-mode div[style*="background: #f"],
+body.dark-mode div[style*="background:#f"],
+body.dark-mode div[style*="background: rgb(2"],
+body.dark-mode div[style*="background-color: #e"],
+body.dark-mode div[style*="background-color: #f"],
+body.dark-mode div[style*="#e8f4fd"],
+body.dark-mode div[style*="#f8f9fa"],
+body.dark-mode div[style*="#fff3e0"],
+body.dark-mode .resultado-cliente,
+body.dark-mode .info-prestamo {
+    color: #1a202c !important;
+}
+
+body.dark-mode div[style*="background: #e"] *,
+body.dark-mode div[style*="background:#e"] *,
+body.dark-mode div[style*="background: #f"] *,
+body.dark-mode div[style*="background:#f"] *,
+body.dark-mode div[style*="#e8f4fd"] *,
+body.dark-mode div[style*="#f8f9fa"] *,
+body.dark-mode div[style*="#fff3e0"] *,
+body.dark-mode .resultado-cliente *,
+body.dark-mode .info-prestamo * {
+    color: #1a202c !important;
+}
+
+/* Badge fixes - keep their colors */
+body.dark-mode .badge-vencida {
+    color: white !important;
+}
+
+body.dark-mode .badge-pagada {
+    color: white !important;
+}
+
 /* ==================== MOBILE RESPONSIVE ==================== */
 @media (max-width: 992px) {
     .sidebar {
