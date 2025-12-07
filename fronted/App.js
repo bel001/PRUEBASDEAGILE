@@ -1,6 +1,9 @@
 // API URL - funciona tanto en local como en producción
-// API URL - MODIFICADO PARA GARANTIZAR CONEXIÓN LOCAL
-const API_URL = 'http://localhost:4000';
+// Si estamos en localhost o abriendo como archivo, usamos localhost:4000
+// Si estamos en producción (Render), usamos URL relativa (vacía)
+const API_URL = (window.location.hostname === 'localhost' || window.location.protocol === 'file:')
+    ? 'http://localhost:4000'
+    : '';
 
 // ==================== SISTEMA DE LOGIN ====================
 // Validar sesión al cargar la página
