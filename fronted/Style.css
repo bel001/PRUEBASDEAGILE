@@ -108,42 +108,65 @@ p {
     background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
 }
 
-/* Navegación */
+/* Navegación - MODERN DESIGN */
 nav {
     display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 8px;
+    margin-bottom: 25px;
     justify-content: center;
+    flex-wrap: wrap;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 15px 20px;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
 }
 
 .nav-btn {
-    padding: 10px 20px;
+    padding: 12px 24px;
     border: none;
-    background: #e0e0e0;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
     cursor: pointer;
-    border-radius: 5px;
-    font-weight: bold;
-    color: #555;
+    border-radius: 12px;
+    font-weight: 600;
+    color: white;
+    font-size: 0.95em;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.nav-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .nav-btn.active {
-    background: #3498db;
-    color: white;
+    background: white;
+    color: #667eea;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
-/* Tarjetas */
+/* Tarjetas - MODERN GLASSMORPHISM */
 .card {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    margin-bottom: 25px;
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
 }
 
 .card-header {
-    background: #f8f9fa;
-    padding: 15px 20px;
-    border-bottom: 1px solid #eee;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 18px 24px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -151,107 +174,157 @@ nav {
 
 .card-header h3 {
     margin: 0;
-    font-size: 1.1em;
-    color: #34495e;
+    font-size: 1.15em;
+    color: #2c3e50;
+    font-weight: 700;
 }
 
 .card-body {
-    padding: 20px;
+    padding: 24px;
 }
 
-/* Formularios */
+/* Formularios - MODERN */
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 18px;
 }
 
 label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     font-weight: 600;
     font-size: 0.9em;
+    color: #4a5568;
 }
 
 input,
 select {
     width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 14px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
     font-size: 1em;
     box-sizing: border-box;
+    transition: all 0.3s ease;
+    background: #f8fafc;
+}
+
+input:focus,
+select:focus {
+    border-color: #667eea;
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    background: white;
 }
 
 .input-group {
     display: flex;
-    gap: 10px;
+    gap: 12px;
 }
 
-/* Botones */
+/* Botones - MODERN */
 button {
     cursor: pointer;
-    transition: background 0.3s;
+    transition: all 0.3s ease;
 }
 
 .btn-secondary {
-    background: #27ae60;
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
     color: white;
     border: none;
-    padding: 0 20px;
-    border-radius: 4px;
-    font-weight: bold;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
     white-space: nowrap;
+    box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
 }
 
 .btn-secondary:hover {
-    background: #219150;
+    background: linear-gradient(135deg, #219150 0%, #27ae60 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
 }
 
 .btn-small {
-    background: #95a5a6;
+    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
     color: white;
     border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 0.8em;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85em;
+    font-weight: 600;
+    transition: all 0.3s ease;
 }
 
-/* Tabla */
+.btn-small:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(9, 132, 227, 0.3);
+}
+
+/* Tabla - MODERN */
 .tabla-clientes {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .tabla-clientes th,
 .tabla-clientes td {
-    padding: 12px;
+    padding: 16px 18px;
     text-align: left;
-    border-bottom: 1px solid #eee;
 }
 
 .tabla-clientes th {
-    background-color: #f8f9fa;
-    color: #7f8c8d;
-    font-size: 0.9em;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tabla-clientes th:first-child {
+    border-radius: 12px 0 0 0;
+}
+
+.tabla-clientes th:last-child {
+    border-radius: 0 12px 0 0;
+}
+
+.tabla-clientes tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.tabla-clientes tr:hover {
+    background: #edf2f7;
+}
+
+.tabla-clientes td {
+    border-bottom: 1px solid #e2e8f0;
 }
 
 /* Mensajes */
 .mensaje {
-    margin-top: 10px;
-    font-weight: bold;
+    margin-top: 12px;
+    font-weight: 600;
     text-align: center;
+    padding: 12px;
+    border-radius: 8px;
 }
 
 .exito {
     color: #27ae60;
+    background: rgba(39, 174, 96, 0.1);
 }
 
 .error {
     color: #c0392b;
+    background: rgba(192, 57, 43, 0.1);
 }
 
 /* Secciones */
 .seccion {
     display: block;
+    animation: fadeIn 0.4s ease;
 }
 
 /* ============================================ */
