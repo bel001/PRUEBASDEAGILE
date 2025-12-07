@@ -158,40 +158,42 @@ async function cargarClientes() {
             // Obtener préstamos para verificar morosidad
             const morosos = [];
             let totalMoraAcumulada = 0;
+            const hoy = new Date().toISOString().split('T')[0];
 
             for (const cliente of clientes) {
-                const resP = await fetch(`${API_URL}/prestamos?cliente_id=${cliente.id}`);
-                const prestamos = await resP.json();
+                try {
+                    // Buscar préstamo activo del cliente
+                    const resP = await fetch(`${API_URL}/prestamos/cliente/${cliente.id}`);
+                    if (!resP.ok) continue; // No tiene préstamo activo
 
-                let tieneVencidas = false;
-                let diasMaxAtraso = 0;
-                let moraTotalCliente = 0;
+                    const data = await resP.json();
+                    const cuotas = data.cuotas || [];
 
-                prestamos.forEach(p => {
-                    if (p.estado === 'ACTIVO' && p.plan_pagos) {
-                        p.plan_pagos.forEach(cuota => {
-                            if (cuota.estado !== 'PAGADO') {
-                                const fechaVenc = new Date(cuota.fecha_vencimiento);
-                                const hoy = new Date();
-                                if (fechaVenc < hoy) {
-                                    tieneVencidas = true;
-                                    const diff = Math.ceil((hoy - fechaVenc) / (1000 * 60 * 60 * 24));
-                                    if (diff > diasMaxAtraso) diasMaxAtraso = diff;
+                    let tieneVencidas = false;
+                    let diasMaxAtraso = 0;
+                    let moraTotalCliente = 0;
 
-                                    // Calcular mora
-                                    const mora = (parseFloat(cuota.monto) * 0.01).toFixed(2);
-                                    moraTotalCliente += parseFloat(mora);
-                                }
-                            }
-                        });
+                    cuotas.forEach(cuota => {
+                        if (!cuota.pagada && cuota.fecha_vencimiento < hoy) {
+                            tieneVencidas = true;
+                            const fechaVenc = new Date(cuota.fecha_vencimiento);
+                            const diff = Math.ceil((new Date() - fechaVenc) / (1000 * 60 * 60 * 24));
+                            if (diff > diasMaxAtraso) diasMaxAtraso = diff;
+
+                            // Calcular mora (1% del saldo pendiente)
+                            const mora = cuota.saldo_pendiente * obtenerPorcentajeMora();
+                            moraTotalCliente += mora;
+                        }
+                    });
+
+                    if (tieneVencidas) {
+                        cliente.diasAtraso = diasMaxAtraso;
+                        cliente.moraTotal = moraTotalCliente;
+                        totalMoraAcumulada += moraTotalCliente;
+                        morosos.push(cliente);
                     }
-                });
-
-                if (tieneVencidas) {
-                    cliente.diasAtraso = diasMaxAtraso;
-                    cliente.moraTotal = moraTotalCliente;
-                    totalMoraAcumulada += moraTotalCliente;
-                    morosos.push(cliente);
+                } catch (e) {
+                    // Cliente sin préstamo, ignorar
                 }
             }
 
