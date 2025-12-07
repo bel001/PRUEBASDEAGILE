@@ -1796,6 +1796,148 @@ body.dark-mode .badge-pagada {
     color: white !important;
 }
 
+/* ==================== COMPREHENSIVE DARK MODE TEXT COLORS ==================== */
+/* General text content */
+body.dark-mode p,
+body.dark-mode span,
+body.dark-mode div,
+body.dark-mode li {
+    color: var(--text-primary);
+}
+
+/* Navigation and sidebar text */
+body.dark-mode .nav-item span,
+body.dark-mode .sidebar-nav span,
+body.dark-mode .nav-icon {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+body.dark-mode .nav-item.active span {
+    color: #ffffff;
+}
+
+/* Stat card text */
+body.dark-mode .stat-value {
+    color: var(--text-primary) !important;
+}
+
+body.dark-mode .stat-label {
+    color: var(--text-secondary) !important;
+}
+
+/* Header and date */
+body.dark-mode .content-header h1,
+body.dark-mode #page-title {
+    color: var(--text-primary) !important;
+}
+
+body.dark-mode .header-date,
+body.dark-mode #header-date {
+    color: var(--text-muted) !important;
+}
+
+/* Card content text */
+body.dark-mode .card-body p,
+body.dark-mode .card-body span,
+body.dark-mode .card-body div,
+body.dark-mode .card-body li {
+    color: var(--text-primary);
+}
+
+/* Config section specific */
+body.dark-mode #seccion-config p,
+body.dark-mode #seccion-config span,
+body.dark-mode #seccion-config small,
+body.dark-mode #seccion-config div {
+    color: var(--text-primary) !important;
+}
+
+/* Toast notifications */
+body.dark-mode .toast {
+    background: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border) !important;
+}
+
+/* Search results */
+body.dark-mode .search-results {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+}
+
+body.dark-mode .search-results div {
+    color: var(--text-primary) !important;
+}
+
+/* Cuotas list */
+body.dark-mode #lista-cuotas-vencidas div,
+body.dark-mode #lista-cuotas-vencidas p,
+body.dark-mode #lista-cuotas-vencidas span {
+    color: var(--text-primary) !important;
+}
+
+/* Login card override - keep dark text on light background */
+body.dark-mode .login-card,
+body.dark-mode .login-card * {
+    color: #1a202c;
+}
+
+body.dark-mode .login-card label {
+    color: #4a5568 !important;
+}
+
+body.dark-mode .login-card h1 {
+    color: #1e3a5f !important;
+}
+
+body.dark-mode .login-card h3 {
+    color: #4a5568 !important;
+}
+
+body.dark-mode .login-card input {
+    background: #f8fafc !important;
+    color: #1a202c !important;
+    border-color: #e2e8f0 !important;
+}
+
+/* Calendar day numbers */
+body.dark-mode .calendario-dia .num-dia {
+    color: var(--text-primary) !important;
+}
+
+/* Buttons keep white text */
+body.dark-mode .btn-primary,
+body.dark-mode .btn-secondary,
+body.dark-mode .btn-small,
+body.dark-mode .btn-danger {
+    color: white !important;
+}
+
+/* Inline style fixes - cover edge cases */
+body.dark-mode [style*="color: #333"],
+body.dark-mode [style*="color: black"],
+body.dark-mode [style*="color:#333"] {
+    color: var(--text-primary) !important;
+}
+
+body.dark-mode [style*="color: #666"],
+body.dark-mode [style*="color:#666"],
+body.dark-mode [style*="color: #7"] {
+    color: var(--text-secondary) !important;
+}
+
+body.dark-mode [style*="color: #95a5a6"],
+body.dark-mode [style*="color: #7f8c8d"] {
+    color: var(--text-muted) !important;
+}
+
+/* Empty state text */
+body.dark-mode .empty-state,
+body.dark-mode .empty-state-text {
+    color: var(--text-muted) !important;
+}
+
+
 /* ==================== MOBILE RESPONSIVE ==================== */
 @media (max-width: 992px) {
     .sidebar {
