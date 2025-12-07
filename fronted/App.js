@@ -371,49 +371,146 @@ async function cargarClientes() {
     }
 }
 
-async function crearCliente() {
-    const documento = document.getElementById('documento').value.trim();
+// === VALIDACIONES DE FORMULARIO CLIENTE ===
+function actualizarMaxLengthDocumento() {
     const tipo = document.getElementById('tipo').value;
+    const docInput = document.getElementById('documento');
+    const mensaje = document.getElementById('doc-mensaje');
+
+    if (tipo === 'DNI') {
+        docInput.maxLength = 8;
+        mensaje.innerText = 'DNI debe tener exactamente 8 dígitos.';
+    } else if (tipo === 'RUC') {
+        docInput.maxLength = 11;
+        mensaje.innerText = 'RUC debe tener exactamente 11 dígitos.';
+    } else {
+        docInput.maxLength = 20;
+        mensaje.innerText = 'Ingrese el número de pasaporte.';
+    }
+    docInput.value = '';
+    document.getElementById('doc-validacion').innerText = '';
+}
+
+function validarDocumento() {
+    const tipo = document.getElementById('tipo').value;
+    const docInput = document.getElementById('documento');
+    const validacion = document.getElementById('doc-validacion');
+    const valor = docInput.value.replace(/[^0-9]/g, '');
+    docInput.value = valor;
+
+    let valido = false;
+    if (tipo === 'DNI' && valor.length === 8) valido = true;
+    if (tipo === 'RUC' && valor.length === 11) valido = true;
+    if (tipo === 'PASAPORTE' && valor.length >= 6) valido = true;
+
+    validacion.innerText = valido ? '✅' : (valor.length > 0 ? '❌' : '');
+    validacion.style.color = valido ? 'var(--secondary)' : 'var(--danger)';
+}
+
+async function verificarDuplicado() {
+    const documento = document.getElementById('documento').value.trim();
+    if (documento.length < 6) return;
+
+    try {
+        const res = await fetch(`${API_URL}/clientes`);
+        const clientes = await res.json();
+        const existe = clientes.find(c => c.documento === documento);
+
+        if (existe) {
+            document.getElementById('doc-validacion').innerText = '⚠️ Ya existe';
+            document.getElementById('doc-validacion').style.color = 'var(--warning)';
+            document.getElementById('doc-mensaje').innerText = `Cliente ya registrado: ${existe.nombre}`;
+            document.getElementById('nombre').value = existe.nombre;
+            document.getElementById('telefono').value = existe.telefono || '';
+            document.getElementById('direccion').value = existe.direccion || '';
+            document.getElementById('email').value = existe.email || '';
+            mostrarToast(`Este cliente ya existe: ${existe.nombre}`, 'warning');
+        }
+    } catch (err) {
+        console.error('Error verificando duplicado:', err);
+    }
+}
+
+function limpiarFormularioCliente() {
+    document.getElementById('tipo').value = 'DNI';
+    document.getElementById('documento').value = '';
+    document.getElementById('nombre').value = '';
+    document.getElementById('direccion').value = '';
+    document.getElementById('telefono').value = '';
+    document.getElementById('email').value = '';
+    document.getElementById('doc-validacion').innerText = '';
+    document.getElementById('doc-mensaje').innerText = 'DNI debe tener exactamente 8 dígitos.';
+    document.getElementById('mensaje').innerText = '';
+    document.getElementById('mensaje').className = 'mensaje';
+    actualizarMaxLengthDocumento();
+}
+
+async function crearCliente() {
+    const tipo = document.getElementById('tipo').value;
+    const documento = document.getElementById('documento').value.trim();
+    const nombre = document.getElementById('nombre').value.trim();
+    const direccion = document.getElementById('direccion').value.trim();
+    const telefono = document.getElementById('telefono').value.trim();
+    const email = document.getElementById('email').value.trim();
     const mensajeDiv = document.getElementById('mensaje');
 
     // Limpiar mensajes previos
     mensajeDiv.className = 'mensaje';
     mensajeDiv.innerText = '';
 
-    if (!documento) {
-        mostrarToast("Por favor escribe un número de documento", "warning");
+    // Validaciones
+    const errores = [];
+
+    if (!documento) errores.push('Número de documento');
+    if (tipo === 'DNI' && documento.length !== 8) errores.push('DNI debe tener 8 dígitos');
+    if (tipo === 'RUC' && documento.length !== 11) errores.push('RUC debe tener 11 dígitos');
+    if (!nombre) errores.push('Nombre completo');
+    if (!direccion) errores.push('Dirección');
+    if (!telefono) errores.push('Teléfono/WhatsApp');
+    if (telefono && telefono.length !== 9) errores.push('Teléfono debe tener 9 dígitos');
+    if (email && !email.includes('@')) errores.push('Email inválido');
+
+    if (errores.length > 0) {
+        mostrarToast(`Campos faltantes o inválidos: ${errores.join(', ')}`, 'warning');
+        mensajeDiv.innerText = `❌ Complete los campos obligatorios: ${errores.join(', ')}`;
+        mensajeDiv.classList.add('error');
         return;
     }
 
-    mensajeDiv.innerText = "⏳ Consultando RENIEC/SUNAT y guardando...";
+    mensajeDiv.innerText = '⏳ Guardando cliente...';
 
     try {
-        const res = await fetch(`${API_URL}/clientes/crear-desde-api`, {
+        const res = await fetch(`${API_URL}/clientes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tipo,
                 documento,
-                email: "", // Opcionales por ahora
-                telefono: ""
+                nombre,
+                direccion,
+                telefono,
+                email
             })
         });
 
         const data = await res.json();
 
         if (res.ok) {
-            mensajeDiv.innerText = `✅ ¡Éxito! Cliente guardado: ${data.nombre}`;
+            mensajeDiv.innerText = `✅ ¡Cliente registrado exitosamente!`;
             mensajeDiv.classList.add('exito');
-            document.getElementById('documento').value = ''; // Limpiar input
-            cargarClientes(); // Recargar la tabla
+            mostrarToast(`Cliente ${nombre} guardado correctamente`, 'success');
+            limpiarFormularioCliente();
+            cargarClientes();
         } else {
             mensajeDiv.innerText = `❌ Error: ${data.error}`;
             mensajeDiv.classList.add('error');
+            mostrarToast(data.error, 'error');
         }
     } catch (error) {
         console.error(error);
-        mensajeDiv.innerText = "❌ Error de conexión con el Backend";
+        mensajeDiv.innerText = '❌ Error de conexión con el servidor';
         mensajeDiv.classList.add('error');
+        mostrarToast('Error de conexión', 'error');
     }
 }
 
