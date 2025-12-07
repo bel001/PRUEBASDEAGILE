@@ -910,9 +910,30 @@
                 </div>
             </div>
             <div class="card-body">
+                <!-- Leyenda del calendario -->
+                <div class="calendario-legend">
+                    <div class="legend-item">
+                        <span class="legend-dot hoy"></span>
+                        <span>Hoy</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot pendiente"></span>
+                        <span>Con vencimientos</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot vencido"></span>
+                        <span>Vencidos</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot pagado"></span>
+                        <span>Pagados</span>
+                    </div>
+                </div>
+
                 <div id="calendario-grid" class="calendario-container">
                     <!-- Calendario será generado por JS -->
                 </div>
+
 
                 <!-- Lista de vencimientos del día seleccionado -->
                 <div id="vencimientos-dia" style="margin-top: 20px; display: none;">
