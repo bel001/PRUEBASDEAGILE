@@ -1500,14 +1500,46 @@ body.dark-mode .search-global input {
     color: #ffffff !important;
 }
 
+body.dark-mode .calendario-container {
+    background: #1a202c !important;
+}
+
+body.dark-mode .calendario-header {
+    background: linear-gradient(135deg, #2c5282 0%, #4a90d9 100%) !important;
+    color: #ffffff !important;
+}
+
 body.dark-mode .calendario-dia {
     background: #2d3748;
     color: #e2e8f0;
+    border-color: #3d4a5c;
 }
 
 body.dark-mode .calendario-dia:hover {
     background: #4a5568;
+    border-color: #5a6b7e;
 }
+
+body.dark-mode .calendario-dia.hoy {
+    border-color: var(--primary-light) !important;
+    background: linear-gradient(135deg, rgba(44, 82, 130, 0.3) 0%, rgba(74, 144, 217, 0.3) 100%) !important;
+}
+
+body.dark-mode .calendario-dia.con-vencimientos {
+    background: rgba(221, 107, 32, 0.2) !important;
+    border-color: var(--warning) !important;
+}
+
+body.dark-mode .calendario-dia.vencidos,
+body.dark-mode .calendario-dia.tiene-vencidas {
+    background: rgba(229, 62, 62, 0.2) !important;
+    border-color: var(--danger) !important;
+}
+
+body.dark-mode .calendario-legend {
+    color: #e2e8f0;
+}
+
 
 
 /* CRITICAL: Force dark text on light backgrounds in dark mode */
