@@ -738,34 +738,58 @@ function generarComprobantePDF(datoPago) {
     const margen = 20;
     let y = 20;
 
-    // Título
-    doc.setFontSize(18);
+    // CABECERA FORMAL
+    doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
-    doc.text('AGILE PRÉSTAMOS', 105, y, { align: 'center' });
+    doc.text('AGILE PRÉSTAMOS S.A.C.', 105, y, { align: 'center' });
+
+    y += 7;
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text('RUC: 20612345678', 105, y, { align: 'center' });
+
+    y += 5;
+    doc.text('Av. Principal 123, Lima - Perú', 105, y, { align: 'center' });
+
+    y += 5;
+    doc.text('Tel: (01) 234-5678', 105, y, { align: 'center' });
 
     y += 10;
-    doc.setFontSize(14);
-    doc.text('Comprobante de Pago', 105, y, { align: 'center' });
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('COMPROBANTE DE PAGO', 105, y, { align: 'center' });
 
-    // Línea separadora
-    y += 10;
-    doc.line(margen, y, 190, y);
-
-    // Datos del cliente
-    y += 15;
+    y += 5;
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    doc.text(`Cliente: ${datoPago.cliente_nombre}`, margen, y);
-
-    y += 7;
-    doc.text(`DNI/RUC: ${datoPago.cliente_doc}`, margen, y);
-
-    y += 7;
-    const fecha = new Date().toLocaleString('es-PE');
-    doc.text(`Fecha: ${fecha}`, margen, y);
+    doc.text(`Nº: ${datoPago.comprobante_id || 'N/A'}`, 105, y, { align: 'center' });
 
     // Línea separadora
+    y += 8;
+    doc.line(margen, y, 190, y);
+
+    // DATOS DEL CLIENTE (FORMAL)
     y += 10;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text('DATOS DEL CLIENTE:', margen, y);
+
+    y += 7;
+    doc.setFont(undefined, 'normal');
+    doc.text(`Nombre/Razón Social: ${datoPago.cliente_nombre}`, margen, y);
+
+    y += 6;
+    doc.text(`DNI/RUC: ${datoPago.cliente_doc}`, margen, y);
+
+    y += 6;
+    doc.text(`Dirección: ${datoPago.cliente_direccion || 'No registrada'}`, margen, y);
+
+    y += 6;
+    const fecha = new Date().toLocaleString('es-PE');
+    doc.text(`Fecha de Pago: ${fecha}`, margen, y);
+
+    // Línea separadora
+    y += 8;
     doc.line(margen, y, 190, y);
 
     // DETALLE DEL PAGO

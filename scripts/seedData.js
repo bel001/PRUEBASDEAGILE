@@ -22,6 +22,7 @@ async function poblarDatos() {
             tipo: 'NATURAL',
             documento: '12345678',
             nombre: 'PEREZ GARCIA JUAN CARLOS',
+            direccion: 'Av. Larco 567, Miraflores',
             email: 'juan.perez@example.com',
             telefono: '999888777',
             creado_en: new Date().toISOString()
@@ -111,6 +112,7 @@ async function poblarDatos() {
             tipo: 'NATURAL',
             documento: '87654321',
             nombre: 'LOPEZ MARTINEZ MARIA ELENA',
+            direccion: 'Jr. Los Olivos 456, San Isidro',
             email: 'maria.lopez@example.com',
             telefono: '988777666',
             creado_en: new Date().toISOString()
@@ -142,13 +144,14 @@ async function poblarDatos() {
         console.log('   ✅ Cuota de S/ 33.33 creada para demo de redondeo\n');
 
         // ============================================
-        // Cliente 3: Carlos Ruiz - Deuda vencida hace 15 días
+        // Cliente 3: Carlos Ruiz - MORA 2 MESES (60 días)
         // ============================================
-        console.log('📝 Creando Cliente 3: Carlos Ruiz...');
+        console.log('📝 Creando Cliente 3: Carlos Ruiz (MORA GRAVE)...');
         const cliente3Ref = await db.collection('clientes').add({
             tipo: 'NATURAL',
             documento: '11111111',
             nombre: 'RUIZ SANCHEZ CARLOS ALBERTO',
+            direccion: 'Av. Argentina 789, Cercado de Lima',
             email: 'carlos.ruiz@example.com',
             telefono: '977666555',
             creado_en: new Date().toISOString()
@@ -160,25 +163,105 @@ async function poblarDatos() {
             monto_total: 2000,
             num_cuotas: 20,
             monto_por_cuota: 100,
-            fecha_inicio: '2024-11-15',
+            fecha_inicio: '2024-09-01',
             cancelado: false,
             creado_en: new Date().toISOString()
         });
         console.log('   ✅ Préstamo creado con ID:', prestamo3Ref.id);
 
-        // Cuota VENCIDA hace 15 días
-        const hace15Dias = new Date();
-        hace15Dias.setDate(hace15Dias.getDate() - 15);
+        // Cuota VENCIDA hace 60 días (2 meses de mora)
+        const hace60Dias = new Date();
+        hace60Dias.setDate(hace60Dias.getDate() - 60);
         await db.collection('cuotas').add({
             prestamo_id: prestamo3Ref.id,
             cliente_id: cliente3Ref.id,
             numero_cuota: 1,
-            fecha_vencimiento: hace15Dias.toISOString().split('T')[0],
+            fecha_vencimiento: hace60Dias.toISOString().split('T')[0],
             monto_cuota: 100,
             saldo_pendiente: 100,
             pagada: false
         });
-        console.log('   ✅ Cuota VENCIDA creada (15 días de atraso)\n');
+        console.log('   ✅ Cuota VENCIDA creada (60 días = 2 MESES de atraso)\n');
+
+        // ============================================
+        // Cliente 4: Ana Torres - AL DÍA (sin mora)
+        // ============================================
+        console.log('📝 Creando Cliente 4: Ana Torres (AL DÍA)...');
+        const cliente4Ref = await db.collection('clientes').add({
+            tipo: 'NATURAL',
+            documento: '22222222',
+            nombre: 'TORRES MEDINA ANA LUCIA',
+            direccion: 'Calle Las Flores 321, Miraflores',
+            email: 'ana.torres@example.com',
+            telefono: '966555444',
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Cliente creado con ID:', cliente4Ref.id);
+
+        const prestamo4Ref = await db.collection('prestamos').add({
+            cliente_id: cliente4Ref.id,
+            monto_total: 500,
+            num_cuotas: 5,
+            monto_por_cuota: 100,
+            fecha_inicio: new Date().toISOString().split('T')[0],
+            cancelado: false,
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Préstamo creado con ID:', prestamo4Ref.id);
+
+        // Cuota que vence en 15 días (SIN MORA)
+        const en15Dias = new Date();
+        en15Dias.setDate(en15Dias.getDate() + 15);
+        await db.collection('cuotas').add({
+            prestamo_id: prestamo4Ref.id,
+            cliente_id: cliente4Ref.id,
+            numero_cuota: 1,
+            fecha_vencimiento: en15Dias.toISOString().split('T')[0],
+            monto_cuota: 100,
+            saldo_pendiente: 100,
+            pagada: false
+        });
+        console.log('   ✅ Cuota AL DÍA creada (vence en 15 días, SIN MORA)\n');
+
+        // ============================================
+        // Cliente 5: Empresa SAC - Para probar RUC
+        // ============================================
+        console.log('📝 Creando Cliente 5: Empresa Demo SAC...');
+        const cliente5Ref = await db.collection('clientes').add({
+            tipo: 'JURIDICA',
+            documento: '20512345678',
+            nombre: 'DISTRIBUIDORA EL SOL S.A.C.',
+            direccion: 'Av. Industrial 1500, Ate Vitarte',
+            email: 'contacto@distribuidoraelsol.com',
+            telefono: '016543210',
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Cliente EMPRESA creado con ID:', cliente5Ref.id);
+
+        const prestamo5Ref = await db.collection('prestamos').add({
+            cliente_id: cliente5Ref.id,
+            monto_total: 5000,
+            num_cuotas: 10,
+            monto_por_cuota: 500,
+            fecha_inicio: new Date().toISOString().split('T')[0],
+            cancelado: false,
+            creado_en: new Date().toISOString()
+        });
+        console.log('   ✅ Préstamo creado con ID:', prestamo5Ref.id);
+
+        // Cuota de S/ 0.10 para demo con pago real
+        const en30Dias = new Date();
+        en30Dias.setDate(en30Dias.getDate() + 30);
+        await db.collection('cuotas').add({
+            prestamo_id: prestamo5Ref.id,
+            cliente_id: cliente5Ref.id,
+            numero_cuota: 1,
+            fecha_vencimiento: en30Dias.toISOString().split('T')[0],
+            monto_cuota: 0.10,
+            saldo_pendiente: 0.10,
+            pagada: false
+        });
+        console.log('   ✅ Cuota de S/ 0.10 creada para demo pago YAPE real\n');
 
         // ============================================
         // RESUMEN
@@ -190,16 +273,20 @@ async function poblarDatos() {
         console.log('1️⃣  JUAN PÉREZ (DNI: 12345678)');
         console.log('    - Cuota #3: S/ 100.00 VENCIDA hace 30 días');
         console.log('    - Mora esperada: S/ 1.00 (1%)');
-        console.log('    - Total a pagar: S/ 101.00');
         console.log('    - Cuota #5: S/ 0.10 (para pago real con Yape)\n');
         console.log('2️⃣  MARÍA LÓPEZ (DNI: 87654321)');
         console.log('    - Cuota #1: S/ 33.33 AL DÍA');
         console.log('    - Redondeo en efectivo: S/ 33.30');
         console.log('    - Ajuste: -S/ 0.03\n');
-        console.log('3️⃣  CARLOS RUIZ (DNI: 11111111)');
-        console.log('    - Cuota #1: S/ 100.00 VENCIDA hace 15 días');
-        console.log('    - Mora esperada: S/ 1.00 (1%)');
-        console.log('    - Total a pagar: S/ 101.00\n');
+        console.log('3️⃣  CARLOS RUIZ (DNI: 11111111) [MORA GRAVE]');
+        console.log('    - Cuota #1: S/ 100.00 VENCIDA hace 60 DÍAS (2 meses)');
+        console.log('    - Mora esperada: S/ 2.00 (2%)\n');
+        console.log('4️⃣  ANA TORRES (DNI: 22222222) [AL DÍA]');
+        console.log('    - Cuota #1: S/ 100.00 vence en 15 días');
+        console.log('    - SIN MORA (mora debe ser S/ 0.00)\n');
+        console.log('5️⃣  DISTRIBUIDORA EL SOL S.A.C. (RUC: 20512345678) [EMPRESA]');
+        console.log('    - Cuota #1: S/ 0.10 (para demo pago real Yape)');
+        console.log('    - Demuestra soporte para personas jurídicas\n');
         console.log('═══════════════════════════════════════════════════════════');
         console.log('✅ Base de datos lista para la exposición académica');
         console.log('═══════════════════════════════════════════════════════════\n');
