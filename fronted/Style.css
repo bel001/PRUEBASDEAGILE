@@ -165,6 +165,13 @@ body {
 
 .sidebar-nav {
     padding: 20px 0;
+    display: block !important;
+}
+
+/* Override any legacy nav display:none */
+.sidebar nav.sidebar-nav,
+nav.sidebar-nav {
+    display: block !important;
 }
 
 .nav-item {
