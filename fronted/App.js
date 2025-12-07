@@ -1,5 +1,6 @@
 // API URL - funciona tanto en local como en producción
-const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:4000' : '';
+// API URL - MODIFICADO PARA GARANTIZAR CONEXIÓN LOCAL
+const API_URL = 'http://localhost:4000';
 
 // ==================== SISTEMA DE LOGIN ====================
 // Validar sesión al cargar la página
@@ -28,7 +29,9 @@ function mostrarAplicacion(usuario) {
     document.getElementById('app-principal').style.display = 'block';
 
     // Mostrar nombre del cajero
-    document.getElementById('nombre-cajero').innerText = usuario.charAt(0).toUpperCase() + usuario.slice(1);
+    const nombre = usuario.charAt(0).toUpperCase() + usuario.slice(1);
+    const rol = localStorage.getItem('cajero_rol') || 'cajero';
+    document.getElementById('nombre-cajero').innerText = `${nombre} (${rol.toUpperCase()})`;
 
     // Cargar datos iniciales
     cargarClientes();
@@ -41,7 +44,86 @@ function cerrarSesion() {
     }
 }
 
+// Función para cambiar de sección
+function mostrarSeccion(id) {
+    // Ocultar todas las secciones
+    const secciones = document.querySelectorAll('.seccion');
+    secciones.forEach(s => s.style.display = 'none');
+
+    // Mostrar la seleccionada
+    const seccion = document.getElementById(`seccion-${id}`);
+    if (seccion) seccion.style.display = 'block';
+
+    // Actualizar botones de navegación
+    const botones = document.querySelectorAll('.nav-btn');
+    botones.forEach(b => b.classList.remove('active'));
+
+    // Botón específico para caja tiene su propia función, pero para otros:
+    const btnMap = {
+        'clientes': 0, 'prestamos': 1, 'pagos': 2, 'caja': 3, 'empleados': 4
+    };
+    if (botones[btnMap[id]]) botones[btnMap[id]].classList.add('active');
+
+    // Cargar datos si es necesario
+    if (id === 'clientes') cargarClientes();
+    if (id === 'empleados') cargarEmpleados();
+}
+
+function mostrarCaja() {
+    mostrarSeccion('caja');
+    cargarEstadoCaja();
+}
+
 // ==================== MÓDULO CLIENTES ====================
+let filtroMorososActivo = false;
+
+// Función para mostrar Toast Notifications
+function mostrarToast(mensaje, tipo = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${tipo}`;
+
+    let icon = 'ℹ️';
+    if (tipo === 'success') icon = '✅';
+    if (tipo === 'error') icon = '❌';
+    if (tipo === 'warning') icon = '⚠️';
+
+    toast.innerHTML = `
+        <div class="toast-icon">${icon}</div>
+        <div class="toast-content">
+            <div class="toast-title">${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</div>
+            <div class="toast-message">${mensaje}</div>
+        </div>
+        <div class="toast-close" onclick="this.parentElement.remove()">✕</div>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto eliminar después de 3 segundos
+    setTimeout(() => {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+function toggleFiltroMorosos() {
+    filtroMorososActivo = !filtroMorososActivo;
+    const btn = document.getElementById('btn-filtro-morosos');
+    const stats = document.getElementById('stats-morosos');
+
+    if (filtroMorososActivo) {
+        btn.classList.add('active');
+        btn.innerHTML = '📋 Ver Todos';
+        stats.style.display = 'flex';
+        mostrarToast('Mostrando solo clientes con deudas vencidas', 'warning');
+    } else {
+        btn.classList.remove('active');
+        btn.innerHTML = '⚠️ Ver Solo Morosos';
+        stats.style.display = 'none';
+        mostrarToast('Mostrando todos los clientes', 'info');
+    }
+    cargarClientes();
+}
 
 
 async function cargarClientes() {
@@ -50,7 +132,7 @@ async function cargarClientes() {
 
     try {
         const res = await fetch(`${API_URL}/clientes`);
-        const clientes = await res.json();
+        let clientes = await res.json(); // Usamos let para poder filtrar
 
         lista.innerHTML = ''; // Limpiar
 
@@ -59,14 +141,80 @@ async function cargarClientes() {
             return;
         }
 
-        // Ordenar: Los más recientes primero
-        clientes.sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en));
+        // LÓGICA DE FILTRO DE MOROSOS
+        if (filtroMorososActivo) {
+            // Obtener préstamos para verificar morosidad
+            const morosos = [];
+            let totalMoraAcumulada = 0;
+
+            for (const cliente of clientes) {
+                const resP = await fetch(`${API_URL}/prestamos?cliente_id=${cliente.id}`);
+                const prestamos = await resP.json();
+
+                let tieneVencidas = false;
+                let diasMaxAtraso = 0;
+                let moraTotalCliente = 0;
+
+                prestamos.forEach(p => {
+                    if (p.estado === 'ACTIVO' && p.plan_pagos) {
+                        p.plan_pagos.forEach(cuota => {
+                            if (cuota.estado !== 'PAGADO') {
+                                const fechaVenc = new Date(cuota.fecha_vencimiento);
+                                const hoy = new Date();
+                                if (fechaVenc < hoy) {
+                                    tieneVencidas = true;
+                                    const diff = Math.ceil((hoy - fechaVenc) / (1000 * 60 * 60 * 24));
+                                    if (diff > diasMaxAtraso) diasMaxAtraso = diff;
+
+                                    // Calcular mora
+                                    const mora = (parseFloat(cuota.monto) * 0.01).toFixed(2);
+                                    moraTotalCliente += parseFloat(mora);
+                                }
+                            }
+                        });
+                    }
+                });
+
+                if (tieneVencidas) {
+                    cliente.diasAtraso = diasMaxAtraso;
+                    cliente.moraTotal = moraTotalCliente;
+                    totalMoraAcumulada += moraTotalCliente;
+                    morosos.push(cliente);
+                }
+            }
+
+            // Ordenar por días de atraso (mayor a menor)
+            morosos.sort((a, b) => b.diasAtraso - a.diasAtraso);
+            clientes = morosos;
+
+            // Actualizar stats
+            document.getElementById('total-mora-acumulada').innerText = `Total Mora: S/ ${totalMoraAcumulada.toFixed(2)}`;
+        } else {
+            // Ordenar por fecha de creación (default)
+            clientes.sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en));
+        }
+
+        if (filtroMorososActivo && clientes.length === 0) {
+            lista.innerHTML = '<tr><td colspan="4" style="text-align:center; color: #27ae60;">✨ ¡Excelente! No hay clientes morosos</td></tr>';
+            return;
+        }
 
         clientes.forEach(c => {
             const row = document.createElement('tr');
+
+            let extraInfo = '';
+            if (filtroMorososActivo) {
+                row.style.backgroundColor = '#fff3e0';
+                row.style.borderLeft = '4px solid #e74c3c';
+                extraInfo = `<br><span class="badge-vencida">📅 ${c.diasAtraso} días atraso</span> <span style="font-size:0.8em; color:#c0392b;">(Mora: S/ ${c.moraTotal.toFixed(2)})</span>`;
+            }
+
             row.innerHTML = `
                 <td><strong>${c.documento}</strong></td>
-                <td>${c.nombre}</td>
+                <td>
+                    ${c.nombre}
+                    ${extraInfo}
+                </td>
                 <td><span style="font-size:0.8em; padding:3px 8px; background:#eee; border-radius:10px;">${c.tipo}</span></td>
                 <td>
                     <button class="btn-small" onclick="verPrestamo('${c.id}')">Ver Préstamos</button>
@@ -77,6 +225,7 @@ async function cargarClientes() {
     } catch (error) {
         console.error("Error cargando clientes:", error);
         lista.innerHTML = '<tr><td colspan="4" style="color:red; text-align:center">Error conectando con el servidor. ¿Está prendido?</td></tr>';
+        mostrarToast('Error de conexión con el servidor', 'error');
     }
 }
 
@@ -90,7 +239,7 @@ async function crearCliente() {
     mensajeDiv.innerText = '';
 
     if (!documento) {
-        alert("Por favor escribe un número de documento");
+        mostrarToast("Por favor escribe un número de documento", "warning");
         return;
     }
 
@@ -155,7 +304,7 @@ async function buscarClienteParaPrestamo() {
     mensajeDiv.innerText = '';
 
     if (!busqueda) {
-        alert('Ingrese un número de documento o nombre');
+        mostrarToast('Ingrese un número de documento o nombre', 'warning');
         return;
     }
 
@@ -193,7 +342,7 @@ async function buscarClienteParaPrestamo() {
 
 async function crearPrestamo() {
     if (!clienteSeleccionado) {
-        alert('Primero busque un cliente');
+        mostrarToast('Primero busque un cliente', 'warning');
         return;
     }
 
@@ -205,17 +354,17 @@ async function crearPrestamo() {
     mensajeDiv.innerText = '';
 
     if (!monto || !cuotas) {
-        alert('Complete todos los campos');
+        mostrarToast('Complete todos los campos', 'warning');
         return;
     }
 
     if (monto > 20000) {
-        alert('El monto máximo es S/ 20,000');
+        mostrarToast('El monto máximo es S/ 20,000', 'error');
         return;
     }
 
     if (cuotas > 24) {
-        alert('El número máximo de cuotas es 24');
+        mostrarToast('El número máximo de cuotas es 24', 'error');
         return;
     }
 
@@ -309,6 +458,12 @@ async function mostrarDetallePrestamo(clienteId, prestamoData) {
                     <td>S/ ${cuota.monto_cuota}</td>
                     <td>S/ ${cuota.saldo_pendiente}</td>
                     <td>${estado}</td>
+                    <td>
+                        <button class="btn-small" style="background: #3498db; padding: 2px 5px; font-size: 0.8em;" 
+                            onclick="verHistorial('${cuota.id}', ${cuota.numero_cuota}, '${prestamo.cliente_nombre}', '${prestamo.cliente_documento}')">
+                            📜 Historial
+                        </button>
+                    </td>
                 `;
                 tablaCuotas.appendChild(row);
             });
@@ -336,7 +491,7 @@ async function buscarClienteParaPago() {
     mensajeDiv.innerText = '';
 
     if (!busqueda) {
-        alert('Ingrese un número de documento o nombre');
+        mostrarToast('Ingrese un número de documento o nombre', 'warning');
         return;
     }
 
@@ -480,7 +635,7 @@ function actualizarRedondeo() {
 
 async function procesarPago() {
     if (!cuotaSeleccionada) {
-        alert('Seleccione una cuota');
+        mostrarToast('Seleccione una cuota', 'warning');
         return;
     }
 
@@ -492,7 +647,7 @@ async function procesarPago() {
     mensajeDiv.innerText = '';
 
     if (!montoPagar || montoPagar <= 0) {
-        alert('Ingrese un monto válido');
+        mostrarToast('Ingrese un monto válido', 'warning');
         return;
     }
 
@@ -673,13 +828,18 @@ async function cargarEstadoCaja() {
         if (res.ok) {
             const data = await res.json();
 
-            // Caja está abierta
+            // Caja está abierta - ACTUALIZADO CON NUEVA LÓGICA
             document.getElementById('resumen-inicial').innerText = data.monto_inicial.toFixed(2);
             document.getElementById('resumen-efectivo').innerText = data.EFECTIVO.toFixed(2);
-            document.getElementById('resumen-yape').innerText = data.YAPE.toFixed(2);
-            document.getElementById('resumen-plin').innerText = data.PLIN.toFixed(2);
+
+            // Total Digital (Yape + Plin)
+            const totalDigital = (data.YAPE || 0) + (data.PLIN || 0);
+            document.getElementById('resumen-digital').innerText = totalDigital.toFixed(2);
+
             document.getElementById('resumen-tarjeta').innerText = data.TARJETA.toFixed(2);
-            document.getElementById('resumen-total').innerText = data.total_teorico.toFixed(2);
+
+            // TOTAL DEBE HABER CAJÓN (Inicial + Efectivo)
+            document.getElementById('resumen-total-cajon').innerText = data.saldo_teorico_cajon.toFixed(2);
 
             document.getElementById('caja-cerrada').style.display = 'none';
             document.getElementById('caja-abierta').style.display = 'block';
@@ -736,18 +896,18 @@ async function abrirCaja() {
 }
 
 async function cerrarCaja() {
-    const montoReal = parseFloat(document.getElementById('monto-real-caja').value);
+    const montoReal = parseFloat(document.getElementById('monto-real-cierre').value);
     const mensajeDiv = document.getElementById('mensaje-caja');
 
     mensajeDiv.className = 'mensaje';
     mensajeDiv.innerText = '';
 
-    if (!montoReal || montoReal < 0) {
-        alert('Ingrese el monto real contado');
+    if (isNaN(montoReal) || montoReal < 0) {
+        alert('Por favor, ingrese el dinero físico que contó en el cajón');
         return;
     }
 
-    if (!confirm('¿Está seguro de cerrar la caja? Esta acción generará el reporte del día.')) {
+    if (!confirm('¿Está seguro de cerrar la caja? Esta acción generará el reporte final y cerrará el turno.')) {
         return;
     }
 
@@ -757,27 +917,34 @@ async function cerrarCaja() {
         const res = await fetch(`${API_URL}/caja/cierre`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ total_real: montoReal })
+            body: JSON.stringify({ total_real_efectivo: montoReal })
         });
 
         const data = await res.json();
 
         if (res.ok) {
             const diferencia = data.diferencia;
-            let msg = '✅ Caja cerrada exitosamente. ';
+            let msg = '✅ Caja cerrada exitosamente.\n';
+
+            // Usar saldo_teorico_cajon que viene del backend
+            const saldoEsperado = data.saldo_teorico_cajon || 0;
 
             if (diferencia > 0) {
-                msg += `Sobrante: S/ ${diferencia.toFixed(2)}`;
+                msg += `⚠️ SOBRANTE: S/ ${diferencia.toFixed(2)} (Había más dinero del esperado)`;
             } else if (diferencia < 0) {
-                msg += `Faltante: S/ ${Math.abs(diferencia).toFixed(2)}`;
+                msg += `❌ FALTANTE: S/ ${Math.abs(diferencia).toFixed(2)} (Falta dinero según el sistema)`;
             } else {
-                msg += '✨ Caja cuadra perfectamente - Sin diferencias';
+                msg += '✨ CAJA CUADRADA: El dinero físico coincide exactamente.';
             }
 
+            // Mostrar Toast también para mejor visibilidad
+            mostrarToast(msg, diferencia < 0 ? 'error' : 'success');
+
             mensajeDiv.innerText = msg;
-            mensajeDiv.classList.add('exito');
-            document.getElementById('monto-real-caja').value = '';
-            setTimeout(() => cargarEstadoCaja(), 2000);
+            mensajeDiv.className = diferencia === 0 ? 'mensaje exito' : (diferencia > 0 ? 'mensaje warning' : 'mensaje error');
+
+            document.getElementById('monto-real-cierre').value = '';
+            setTimeout(() => cargarEstadoCaja(), 4000);
         } else {
             mensajeDiv.innerText = `❌ Error: ${data.error}`;
             mensajeDiv.classList.add('error');
@@ -935,5 +1102,137 @@ function iniciarSesion() {
         mostrarAplicacion(usuario);
     } else {
         mensajeDiv.innerText = '❌ Usuario o contraseña incorrectos';
+    }
+}
+
+// ==================== HISTORIAL DE PAGOS Y ANULACIONES ====================
+async function verHistorial(cuotaId, numeroCuota, clienteNombre, clienteDoc) {
+    document.getElementById('historial-num-cuota').innerText = numeroCuota;
+    const lista = document.getElementById('historial-lista');
+    lista.innerHTML = '<p style="text-align: center; color: #666;">Cargando...</p>';
+    document.getElementById('modal-historial').style.display = 'flex';
+
+    // Guardar datos temporalmente en el modal para reuso (simple hack)
+    lista.setAttribute('data-cliente-nombre', clienteNombre);
+    lista.setAttribute('data-cliente-doc', clienteDoc);
+
+    try {
+        const res = await fetch(`${API_URL}/pagos/historial/${cuotaId}`);
+        const pagos = await res.json();
+
+        lista.innerHTML = '';
+
+        if (pagos.length === 0) {
+            lista.innerHTML = '<p style="text-align: center; color: #666;">No hay pagos registrados para esta cuota.</p>';
+            return;
+        }
+
+        const rol = localStorage.getItem('cajero_rol');
+        const esAdmin = rol === 'admin';
+
+        pagos.forEach(pago => {
+            const fecha = new Date(pago.fecha_pago).toLocaleString('es-PE');
+            const esAnulado = pago.estado === 'ANULADO';
+
+            const item = document.createElement('div');
+            item.style.borderBottom = '1px solid #eee';
+            item.style.padding = '10px 0';
+            item.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div>
+                        <div style="font-weight: bold; color: ${esAnulado ? '#e74c3c' : '#2c3e50'};">
+                            ${esAnulado ? '🔴 ANULADO' : '✅ PAGO REALIZADO'}
+                        </div>
+                        <div style="font-size: 0.9em; color: #555;">
+                            Fecha: ${fecha}<br>
+                            Monto: <strong>S/ ${pago.monto_pagado}</strong> (${pago.medio_pago})<br>
+                            ID: <span style="font-family: monospace; font-size: 0.8em;">${pago.id.substring(0, 8)}...</span>
+                        </div>
+                    </div>
+                    <div>
+                        ${!esAnulado && esAdmin ? `
+                            <button class="btn-small" style="background: #e74c3c;" onclick="anularPago('${pago.id}')">
+                                ❌ Anular
+                            </button>
+                        ` : ''}
+                        <button class="btn-small" style="background: #95a5a6; margin-left: 5px;" onclick="reimprimirComprobante('${pago.id}', '${pago.monto_pagado}', '${pago.medio_pago}')">
+                            🖨️
+                        </button>
+                    </div>
+                </div>
+            `;
+            lista.appendChild(item);
+        });
+
+    } catch (error) {
+        console.error(error);
+        lista.innerHTML = '<p style="text-align: center; color: red;">Error cargando historial.</p>';
+    }
+}
+
+function cerrarHistorial() {
+    document.getElementById('modal-historial').style.display = 'none';
+}
+
+async function anularPago(pagoId) {
+    if (!confirm('⚠️ ¿ESTÁ SEGURO DE ANULAR ESTE PAGO?\n\nEsta acción es irreversible:\n1. El dinero se restará de la caja.\n2. La deuda volverá a estar pendiente.')) {
+        return;
+    }
+
+    const usuario = localStorage.getItem('cajero_usuario');
+
+    try {
+        const res = await fetch(`${API_URL}/pagos/anular`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pago_id: pagoId, usuario_solicitante: usuario })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            mostrarToast(`✅ ${data.mensaje}. Nuevo saldo: S/ ${data.nuevo_saldo}`, 'success');
+            cerrarHistorial();
+            // Recargar detalles del préstamo para ver cambios
+            if (clienteSeleccionado) {
+                const resPrestamo = await fetch(`${API_URL}/prestamos/cliente/${clienteSeleccionado.id}`);
+                const dataPrestamo = await resPrestamo.json();
+                mostrarDetallePrestamo(clienteSeleccionado.id, dataPrestamo);
+            }
+        } else {
+            alert(`❌ Error: ${data.error}`);
+        }
+    } catch (error) {
+        console.error(error);
+        alert('❌ Error de conexión');
+    }
+}
+
+// Función para reimpresión de comprobante
+function reimprimirComprobante(id, monto, medio) {
+    if (!clienteSeleccionado) {
+        alert('❌ Error: No hay cliente seleccionado');
+        return;
+    }
+
+    const numCuota = document.getElementById('historial-num-cuota').innerText;
+
+    // Reconstruir objeto de datos para el PDF
+    // Nota: Algunos datos como "Capital" vs "Mora" exactos del momento del pago
+    // no se guardan separados en el historial básico, así que asumiremos el total como monto pagado.
+    const datoPago = {
+        cliente_nombre: clienteSeleccionado.nombre,
+        cliente_doc: clienteSeleccionado.documento,
+        numero_cuota: numCuota,
+        capital: monto, // En reimpresión, mostramos el total pagado como referencia principal
+        mora: 0,        // No tenemos el desglose histórico exacto aquí sin consultar más datos
+        total: monto,
+        medio_pago: medio,
+        ajuste: 0,
+        comprobante_id: id
+    };
+
+    if (confirm('¿Desea volver a descargar el comprobante?')) {
+        generarComprobantePDF(datoPago);
     }
 }

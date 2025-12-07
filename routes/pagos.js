@@ -11,7 +11,7 @@ async function cajaAbiertaHoy() {
     .orderBy('fecha', 'desc')
     .limit(1)
     .get();
-    
+
   if (snapshot.empty) return false;
   const caja = snapshot.docs[0].data();
   return caja.cerrado === false; // En Firebase guardamos booleanos como true/false
@@ -67,9 +67,9 @@ router.post('/', async (req, res) => {
     batch.set(pagoRef, pagoData);
 
     // B) Actualizar Cuota
-    batch.update(cuotaRef, { 
-      saldo_pendiente: nuevo_saldo, 
-      pagada: pagada 
+    batch.update(cuotaRef, {
+      saldo_pendiente: nuevo_saldo,
+      pagada: pagada
     });
 
     // C) Crear Comprobante
@@ -84,8 +84,8 @@ router.post('/', async (req, res) => {
 
     // 5. Enviar Email (Opcional, fuera del proceso crítico)
     if (canal_comprobante === 'EMAIL' && clienteEmail) {
-       // Aquí iría tu lógica de email, la dejamos pendiente para no bloquear
-       console.log("Simulando envío de email a:", clienteEmail);
+      // Aquí iría tu lógica de email, la dejamos pendiente para no bloquear
+      console.log("Simulando envío de email a:", clienteEmail);
     }
 
     res.json({
@@ -93,8 +93,63 @@ router.post('/', async (req, res) => {
       monto_cobrado: montoCobrar,
       nuevo_saldo,
       cuota_pagada: pagada,
-      comprobante: { serie: 'F001', numero: pagoId.substring(0,8) }
+      comprobante: { serie: 'F001', numero: pagoId.substring(0, 8) }
     });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /pagos/anular (NUEVO)
+router.post('/anular', async (req, res) => {
+  const { pago_id, usuario_solicitante } = req.body;
+
+  if (!pago_id) return res.status(400).json({ error: 'Falta ID del pago' });
+
+  try {
+    const pagoRef = db.collection('pagos').doc(pago_id);
+    const pagoSnap = await pagoRef.get();
+
+    if (!pagoSnap.exists) return res.status(404).json({ error: 'Pago no encontrado' });
+    const pago = pagoSnap.data();
+
+    // Validar si ya está anulado
+    if (pago.estado === 'ANULADO') {
+      return res.status(400).json({ error: 'El pago ya está anulado' });
+    }
+
+    // Obtener cuota para revertir saldo
+    const cuotaRef = db.collection('cuotas').doc(pago.cuota_id);
+    const cuotaSnap = await cuotaRef.get();
+
+    if (!cuotaSnap.exists) return res.status(404).json({ error: 'Cuota asociada no encontrada' });
+    const cuota = cuotaSnap.data();
+
+    // Nueva lógica de reversión
+    const montoAnulado = Number(pago.monto_pagado);
+    const nuevoSaldo = Number((cuota.saldo_pendiente + montoAnulado).toFixed(2));
+
+    const batch = db.batch();
+
+    // 1. Marcar pago como ANULADO
+    batch.update(pagoRef, {
+      estado: 'ANULADO',
+      anulado_por: usuario_solicitante,
+      fecha_anulacion: new Date().toISOString()
+    });
+
+    // 2. Revertir saldo en cuota
+    // Si la cuota ya estaba pagada, ahora volverá a ser PENDIENTE (pagada: false)
+    batch.update(cuotaRef, {
+      saldo_pendiente: nuevoSaldo,
+      pagada: false
+    });
+
+    await batch.commit();
+
+    res.json({ mensaje: 'Pago anulado correctamente', nuevo_saldo: nuevoSaldo });
 
   } catch (err) {
     console.error(err);
@@ -108,7 +163,7 @@ router.get('/historial/:cuota_id', async (req, res) => {
     const snapshot = await db.collection('pagos')
       .where('cuota_id', '==', req.params.cuota_id)
       .get(); // Firestore no ordena por fecha sin índice compuesto, lo ordenamos aquí
-      
+
     const pagos = snapshot.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => new Date(b.fecha_pago) - new Date(a.fecha_pago));

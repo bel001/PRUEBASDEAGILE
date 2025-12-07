@@ -35,13 +35,13 @@ router.post('/', async (req, res) => {
 
     // 3. Preparar escritura en lote (Batch) para que sea todo o nada
     const batch = db.batch();
-    
+
     // Crear referencia del nuevo préstamo
     const prestamoRef = db.collection('prestamos').doc();
     const fechaInicio = new Date();
 
     const monto_cuota = Number((monto_total / num_cuotas).toFixed(2));
-    
+
     // Guardar datos del préstamo
     batch.set(prestamoRef, {
       cliente_id,
@@ -60,7 +60,7 @@ router.post('/', async (req, res) => {
     for (let i = 1; i <= num_cuotas; i++) {
       fecha.setDate(fecha.getDate() + 30); // Sumar 30 días
       const fecha_vencimiento = fecha.toISOString().split('T')[0];
-      
+
       const cuotaRef = db.collection('cuotas').doc(); // ID automático
       const dataCuota = {
         prestamo_id: prestamoRef.id,
@@ -73,7 +73,7 @@ router.post('/', async (req, res) => {
       };
 
       batch.set(cuotaRef, dataCuota);
-      
+
       cronograma.push({ cuota_id: cuotaRef.id, ...dataCuota });
     }
 
@@ -128,6 +128,7 @@ router.get('/cliente/:cliente_id', async (req, res) => {
       prestamo: {
         ...prestamo,
         cliente_nombre: clienteData.nombre,
+        cliente_documento: clienteData.documento,
         cliente_email: clienteData.email
       },
       cuotas
