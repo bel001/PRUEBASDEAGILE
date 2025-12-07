@@ -776,126 +776,230 @@ function generarComprobantePDF(datoPago) {
     const doc = new jsPDF();
 
     // Configuración
-    const margen = 20;
-    let y = 20;
+    const margen = 15;
+    let y = 15;
+    const anchoDoc = 210;
+    const altoPagina = 297;
 
-    // CABECERA FORMAL
-    doc.setFontSize(16);
+    // Determinar tipo de documento: FACTURA (RUC 11 dígitos) o BOLETA (DNI 8 dígitos)
+    const docCliente = (datoPago.cliente_doc || '').replace(/\D/g, '');
+    const esFactura = docCliente.length === 11;
+    const tipoDoc = esFactura ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA ELECTRÓNICA';
+    const serieDoc = esFactura ? 'F001' : 'B001';
+    const numDoc = datoPago.comprobante_id ? datoPago.comprobante_id.substring(0, 8).toUpperCase() : '00000001';
+
+    // ==================== CABECERA ====================
+    // Logo placeholder (izquierda)
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margen, y, 40, 25, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text('CAPITAL RISE', margen + 20, y + 10, { align: 'center' });
+    doc.text('LOANS', margen + 20, y + 15, { align: 'center' });
+
+    // Datos de empresa (centro)
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
-    doc.text('AGILE PRÉSTAMOS S.A.C.', 105, y, { align: 'center' });
+    doc.text('CAPITAL RISE LOANS S.A.C.', 105, y + 5, { align: 'center' });
 
-    y += 7;
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    doc.text('RUC: 20612345678', 105, y, { align: 'center' });
+    doc.text('Av. Javier Prado Este 4200, San Isidro', 105, y + 12, { align: 'center' });
+    doc.text('Lima - Perú', 105, y + 17, { align: 'center' });
+    doc.text('Tel: (01) 555-0123 | info@capitalrise.pe', 105, y + 22, { align: 'center' });
 
-    y += 5;
-    doc.text('Av. Principal 123, Lima - Perú', 105, y, { align: 'center' });
+    // Recuadro tipo documento (derecha)
+    doc.setDrawColor(0, 100, 180);
+    doc.setLineWidth(1);
+    doc.rect(145, y, 50, 25);
 
-    y += 5;
-    doc.text('Tel: (01) 234-5678', 105, y, { align: 'center' });
-
-    y += 10;
-    doc.setFontSize(12);
+    doc.setFontSize(9);
     doc.setFont(undefined, 'bold');
-    doc.text('COMPROBANTE DE PAGO', 105, y, { align: 'center' });
+    doc.setTextColor(0, 100, 180);
+    doc.text('R.U.C. 20612345678', 170, y + 7, { align: 'center' });
 
-    y += 5;
     doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Nº: ${datoPago.comprobante_id || 'N/A'}`, 105, y, { align: 'center' });
+    doc.text(tipoDoc, 170, y + 14, { align: 'center' });
 
-    // Línea separadora
-    y += 8;
-    doc.line(margen, y, 190, y);
+    doc.setFontSize(11);
+    doc.text(`${serieDoc} - ${numDoc}`, 170, y + 21, { align: 'center' });
 
-    // DATOS DEL CLIENTE (FORMAL)
-    y += 10;
-    doc.setFontSize(10);
+    // ==================== DATOS DEL CLIENTE ====================
+    y += 35;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.rect(margen, y, anchoDoc - 30, 30);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(9);
     doc.setFont(undefined, 'bold');
-    doc.text('DATOS DEL CLIENTE:', margen, y);
 
     y += 7;
+    doc.text('Fecha de Emisión:', margen + 3, y);
     doc.setFont(undefined, 'normal');
-    doc.text(`Nombre/Razón Social: ${datoPago.cliente_nombre}`, margen, y);
+    const fechaEmision = new Date().toLocaleDateString('es-PE');
+    doc.text(fechaEmision, margen + 40, y);
 
-    y += 6;
-    doc.text(`DNI/RUC: ${datoPago.cliente_doc}`, margen, y);
+    doc.setFont(undefined, 'bold');
+    doc.text('Forma de Pago:', 120, y);
+    doc.setFont(undefined, 'normal');
+    doc.text(datoPago.medio_pago || 'Contado', 155, y);
 
-    y += 6;
-    doc.text(`Dirección: ${datoPago.cliente_direccion || 'No registrada'}`, margen, y);
-
-    y += 6;
-    const fecha = new Date().toLocaleString('es-PE');
-    doc.text(`Fecha de Pago: ${fecha}`, margen, y);
-
-    // Línea separadora
     y += 8;
-    doc.line(margen, y, 190, y);
+    doc.setFont(undefined, 'bold');
+    doc.text('Señor(es):', margen + 3, y);
+    doc.setFont(undefined, 'normal');
+    doc.text(datoPago.cliente_nombre || 'Cliente', margen + 25, y);
 
-    // DETALLE DEL PAGO
+    y += 8;
+    doc.setFont(undefined, 'bold');
+    doc.text(esFactura ? 'RUC:' : 'DNI:', margen + 3, y);
+    doc.setFont(undefined, 'normal');
+    doc.text(datoPago.cliente_doc || '-', margen + 25, y);
+
+    doc.setFont(undefined, 'bold');
+    doc.text('Dirección:', 90, y);
+    doc.setFont(undefined, 'normal');
+    doc.text(datoPago.cliente_direccion || 'Lima, Perú', 115, y);
+
+    // ==================== TABLA DE DETALLE ====================
     y += 15;
+
+    // Cabecera tabla
+    doc.setFillColor(0, 100, 180);
+    doc.rect(margen, y, anchoDoc - 30, 8, 'F');
+
+    doc.setTextColor(255, 255, 255);
     doc.setFont(undefined, 'bold');
-    doc.text('DETALLE DEL PAGO:', margen, y);
-
-    y += 10;
-    doc.setFont(undefined, 'normal');
-    doc.text(`Cuota Nº: ${datoPago.numero_cuota}`, margen, y);
-
-    y += 7;
-    doc.text(`Monto Capital:`, margen, y);
-    doc.text(`S/ ${datoPago.capital}`, 150, y, { align: 'right' });
-
-    if (datoPago.mora > 0) {
-        y += 7;
-        doc.setTextColor(231, 76, 60); // Rojo
-        doc.text(`Mora (1%):`, margen, y);
-        doc.text(`S/ ${datoPago.mora}`, 150, y, { align: 'right' });
-        doc.setTextColor(0, 0, 0); // Negro
-    }
-
-    // Total
-    y += 10;
-    doc.line(margen, y, 150, y);
-
-    y += 7;
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(12);
-    doc.text(`TOTAL PAGADO:`, margen, y);
-    doc.text(`S/ ${datoPago.total}`, 150, y, { align: 'right' });
-
-    // Medio de pago
-    y += 12;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Medio de Pago: ${datoPago.medio_pago}`, margen, y);
-
-    if (datoPago.ajuste != 0) {
-        y += 7;
-        doc.text(`Ajuste Redondeo: S/ ${datoPago.ajuste}`, margen, y);
-    }
-
-    // Línea separadora
-    y += 10;
-    doc.line(margen, y, 190, y);
-
-    // Footer
-    y += 10;
     doc.setFontSize(8);
-    doc.text(`Nº Comprobante: ${datoPago.comprobante_id}`, margen, y);
+    doc.text('CANTIDAD', margen + 5, y + 5.5);
+    doc.text('U.M.', margen + 30, y + 5.5);
+    doc.text('DESCRIPCIÓN', margen + 50, y + 5.5);
+    doc.text('P. UNIT.', margen + 125, y + 5.5);
+    doc.text('IMPORTE', margen + 155, y + 5.5);
 
-    y += 7;
-    doc.text('Cajero: Sistema', margen, y);
+    // Fila de detalle
+    y += 8;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(9);
 
-    y += 15;
-    doc.setFontSize(10);
-    doc.text('Gracias por su pago', 105, y, { align: 'center' });
+    doc.rect(margen, y, anchoDoc - 30, 10);
+    doc.text('1', margen + 10, y + 6.5, { align: 'center' });
+    doc.text('UND', margen + 32, y + 6.5);
+    doc.text(`Pago Cuota ${datoPago.numero_cuota} - Préstamo`, margen + 50, y + 6.5);
+    doc.text(`S/ ${parseFloat(datoPago.capital).toFixed(2)}`, margen + 130, y + 6.5);
+    doc.text(`S/ ${parseFloat(datoPago.capital).toFixed(2)}`, margen + 160, y + 6.5);
 
-    // Descargar
-    const nombreArchivo = `comprobante_${datoPago.comprobante_id.substring(0, 8)}.pdf`;
+    // Fila de mora si existe
+    if (parseFloat(datoPago.mora) > 0) {
+        y += 10;
+        doc.rect(margen, y, anchoDoc - 30, 10);
+        doc.text('1', margen + 10, y + 6.5, { align: 'center' });
+        doc.text('UND', margen + 32, y + 6.5);
+        doc.setTextColor(200, 50, 50);
+        doc.text('Mora por atraso', margen + 50, y + 6.5);
+        doc.text(`S/ ${parseFloat(datoPago.mora).toFixed(2)}`, margen + 130, y + 6.5);
+        doc.text(`S/ ${parseFloat(datoPago.mora).toFixed(2)}`, margen + 160, y + 6.5);
+        doc.setTextColor(0, 0, 0);
+    }
+
+    // ==================== TOTALES ====================
+    y += 25;
+
+    // Recuadro totales
+    doc.rect(120, y, 75, 40);
+
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+
+    const subTotal = parseFloat(datoPago.capital) + parseFloat(datoPago.mora || 0);
+    const igv = 0; // Préstamos exonerados de IGV
+    const total = parseFloat(datoPago.total);
+
+    doc.text('Op. Gravada:', 125, y + 8);
+    doc.text(`S/ 0.00`, 185, y + 8, { align: 'right' });
+
+    doc.text('Op. Exonerada:', 125, y + 16);
+    doc.text(`S/ ${subTotal.toFixed(2)}`, 185, y + 16, { align: 'right' });
+
+    doc.text('IGV (18%):', 125, y + 24);
+    doc.text(`S/ ${igv.toFixed(2)}`, 185, y + 24, { align: 'right' });
+
+    doc.setFontSize(11);
+    doc.text('IMPORTE TOTAL:', 125, y + 34);
+    doc.text(`S/ ${total.toFixed(2)}`, 185, y + 34, { align: 'right' });
+
+    // Monto en letras (izquierda)
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    const montoEntero = Math.floor(total);
+    const centavos = Math.round((total - montoEntero) * 100);
+    doc.text(`SON: ${numeroALetras(montoEntero)} CON ${centavos}/100 SOLES`, margen, y + 10);
+
+    // ==================== PIE DE PÁGINA ====================
+    y += 55;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margen, y, anchoDoc - margen, y);
+
+    y += 8;
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Representación impresa de la ' + tipoDoc.toLowerCase() + ', generada en el Sistema AGILE.', 105, y, { align: 'center' });
+
+    y += 5;
+    doc.text(`Cajero: ${localStorage.getItem('cajero_usuario') || 'Sistema'} | Fecha: ${new Date().toLocaleString('es-PE')}`, 105, y, { align: 'center' });
+
+    y += 5;
+    doc.text('Gracias por su preferencia - www.capitalrise.pe', 105, y, { align: 'center' });
+
+    // ==================== GUARDAR ====================
+    const nombreArchivo = `${serieDoc}-${numDoc}.pdf`;
     doc.save(nombreArchivo);
 
-    console.log(`✅ Comprobante PDF generado: ${nombreArchivo}`);
+    console.log(`✅ ${tipoDoc} generada: ${nombreArchivo}`);
+}
+
+// Función auxiliar para convertir número a letras
+function numeroALetras(num) {
+    const unidades = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+    const decenas = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+    const especiales = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+    const centenas = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+    if (num === 0) return 'CERO';
+    if (num === 100) return 'CIEN';
+
+    let resultado = '';
+
+    if (num >= 1000) {
+        const miles = Math.floor(num / 1000);
+        resultado += miles === 1 ? 'MIL ' : numeroALetras(miles) + ' MIL ';
+        num %= 1000;
+    }
+
+    if (num >= 100) {
+        resultado += centenas[Math.floor(num / 100)] + ' ';
+        num %= 100;
+    }
+
+    if (num >= 10 && num < 20) {
+        resultado += especiales[num - 10];
+        return resultado.trim();
+    }
+
+    if (num >= 20) {
+        resultado += decenas[Math.floor(num / 10)];
+        num %= 10;
+        if (num > 0) resultado += ' Y ';
+    }
+
+    if (num > 0) {
+        resultado += unidades[num];
+    }
+
+    return resultado.trim();
 }
 
 // ==================== MÓDULO CAJA ====================

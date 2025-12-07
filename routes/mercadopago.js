@@ -3,9 +3,9 @@ const router = express.Router();
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const db = require('../db/firebase');
 
-// Inicializar cliente MercadoPago
+// Inicializar cliente MercadoPago con credenciales TEST
 const client = new MercadoPagoConfig({
-    accessToken: process.env.MP_ACCESS_TOKEN || 'APP_USR-5691813975231568-120700-0b4f105120a434d4c1240e2e4d6c21ee-3044196038',
+    accessToken: process.env.MP_ACCESS_TOKEN || 'APP_USR-7403869921548499-120700-2c904f80db45bb9d0e111bd1edd2bc90-3046319007',
     options: { timeout: 5000 }
 });
 
