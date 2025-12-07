@@ -82,7 +82,32 @@ router.post('/', async (req, res) => {
     // Ejecutamos el batch
     await batch.commit();
 
-    // 5. Enviar Email (Opcional, fuera del proceso crítico)
+    // 5. Verificar si TODAS las cuotas del préstamo están pagadas
+    // Si es así, marcar el préstamo como cancelado para permitir nuevos préstamos
+    if (pagada) {
+      const prestamo_id = cuota.prestamo_id;
+      const cuotasSnapshot = await db.collection('cuotas')
+        .where('prestamo_id', '==', prestamo_id)
+        .get();
+
+      const todasPagadas = cuotasSnapshot.docs.every(doc => {
+        const c = doc.data();
+        // La cuota actual ya está actualizada localmente, verificamos por ID
+        if (doc.id === cuota_id) return true; // Esta ya la pagamos
+        return c.pagada === true;
+      });
+
+      if (todasPagadas) {
+        // Marcar préstamo como CANCELADO (terminado)
+        await db.collection('prestamos').doc(prestamo_id).update({
+          cancelado: true,
+          fecha_cancelacion: new Date().toISOString()
+        });
+        console.log(`✅ Préstamo ${prestamo_id} marcado como cancelado - todas las cuotas pagadas`);
+      }
+    }
+
+    // 6. Enviar Email (Opcional, fuera del proceso crítico)
     if (canal_comprobante === 'EMAIL' && clienteEmail) {
       // Aquí iría tu lógica de email, la dejamos pendiente para no bloquear
       console.log("Simulando envío de email a:", clienteEmail);
