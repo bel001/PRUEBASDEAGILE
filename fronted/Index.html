@@ -74,6 +74,10 @@
                     <span class="nav-icon">🏦</span>
                     <span>Caja</span>
                 </button>
+                <button class="nav-item" onclick="mostrarSeccion('calendario')">
+                    <span class="nav-icon">📅</span>
+                    <span>Calendario</span>
+                </button>
                 <button class="nav-item btn-admin" onclick="mostrarSeccion('empleados')">
                     <span class="nav-icon">👤</span>
                     <span>Empleados</span>
@@ -101,7 +105,20 @@
             <!-- HEADER -->
             <div class="content-header">
                 <h1 id="page-title">Dashboard</h1>
-                <span class="header-date" id="header-date"></span>
+                <div class="header-actions">
+                    <!-- Búsqueda Global -->
+                    <div class="search-global">
+                        <input type="text" id="busqueda-global" placeholder="🔍 Buscar cliente, préstamo..."
+                            onkeyup="buscarGlobal(this.value)">
+                        <div id="resultados-busqueda" class="search-results" style="display: none;"></div>
+                    </div>
+                    <!-- Modo Oscuro -->
+                    <button class="btn-icon" onclick="toggleDarkMode()" title="Modo Oscuro/Claro">
+                        <span id="dark-mode-icon">🌙</span>
+                    </button>
+                    <!-- Fecha -->
+                    <span class="header-date" id="header-date"></span>
+                </div>
             </div>
 
             <!-- SECCIÓN DASHBOARD (NUEVA) -->
@@ -835,6 +852,47 @@
                 </div>
 
                 <div id="mensaje-config" class="mensaje" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN CALENDARIO -->
+    <div id="seccion-calendario" class="seccion" style="display:none;">
+        <div class="card">
+            <div class="card-header">
+                <h3>📅 Calendario de Vencimientos</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-small" onclick="cambiarMesCalendario(-1)">◀ Anterior</button>
+                    <span id="calendario-mes-actual"
+                        style="padding: 8px 15px; background: rgba(255,255,255,0.2); border-radius: 8px;"></span>
+                    <button class="btn-small" onclick="cambiarMesCalendario(1)">Siguiente ▶</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="calendario-grid" class="calendario-container">
+                    <!-- Calendario será generado por JS -->
+                </div>
+
+                <!-- Lista de vencimientos del día seleccionado -->
+                <div id="vencimientos-dia" style="margin-top: 20px; display: none;">
+                    <h4 id="vencimientos-dia-titulo">Vencimientos del día</h4>
+                    <div id="lista-vencimientos-dia"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enviar recordatorios -->
+        <div class="card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h3>📧 Enviar Recordatorios</h3>
+            </div>
+            <div class="card-body">
+                <p style="margin-bottom: 15px;">Enviar recordatorio por WhatsApp a todos los clientes con cuotas
+                    vencidas:</p>
+                <button class="btn-secondary" onclick="enviarRecordatoriosMasivos()">
+                    📱 Enviar Recordatorios WhatsApp
+                </button>
+                <div id="mensaje-recordatorios" class="mensaje" style="margin-top: 15px;"></div>
             </div>
         </div>
     </div>

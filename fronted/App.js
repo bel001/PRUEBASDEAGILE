@@ -1693,3 +1693,481 @@ function verEstadoCuenta() {
 function cerrarEstadoCuenta() {
     document.getElementById('modal-estado-cuenta').style.display = 'none';
 }
+
+// ==================== BÚSQUEDA GLOBAL ====================
+let searchTimeout;
+async function buscarGlobal(query) {
+    const resultados = document.getElementById('resultados-busqueda');
+
+    if (query.length < 2) {
+        resultados.style.display = 'none';
+        return;
+    }
+
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`${API_URL}/clientes`);
+            if (!res.ok) return;
+
+            const clientes = await res.json();
+            const termino = query.toLowerCase();
+
+            const coincidencias = clientes.filter(c =>
+                c.nombre.toLowerCase().includes(termino) ||
+                c.documento.includes(termino) ||
+                (c.telefono && c.telefono.includes(termino))
+            ).slice(0, 8);
+
+            if (coincidencias.length === 0) {
+                resultados.innerHTML = '<div class="search-result-item">No se encontraron resultados</div>';
+            } else {
+                resultados.innerHTML = coincidencias.map(c => `
+                    <div class="search-result-item" onclick="irACliente('${c.id}')">
+                        <span class="search-result-type">Cliente</span>
+                        <strong>${c.nombre}</strong> - ${c.documento}
+                    </div>
+                `).join('');
+            }
+
+            resultados.style.display = 'block';
+        } catch (err) {
+            console.error('Error en búsqueda:', err);
+        }
+    }, 300);
+}
+
+function irACliente(clienteId) {
+    document.getElementById('resultados-busqueda').style.display = 'none';
+    document.getElementById('busqueda-global').value = '';
+    mostrarSeccion('clientes');
+    // Resaltar el cliente encontrado
+    setTimeout(() => {
+        const fila = document.querySelector(`tr[data-cliente-id="${clienteId}"]`);
+        if (fila) {
+            fila.style.background = 'rgba(214, 158, 46, 0.3)';
+            fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => fila.style.background = '', 2000);
+        }
+    }, 500);
+}
+
+// Cerrar búsqueda al hacer clic fuera
+document.addEventListener('click', (e) => {
+    const searchBox = document.querySelector('.search-global');
+    if (searchBox && !searchBox.contains(e.target)) {
+        document.getElementById('resultados-busqueda').style.display = 'none';
+    }
+});
+
+// ==================== MODO OSCURO ====================
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const icon = document.getElementById('dark-mode-icon');
+    const isDark = document.body.classList.contains('dark-mode');
+
+    icon.innerText = isDark ? '☀️' : '🌙';
+    localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+}
+
+// Cargar preferencia de modo oscuro al iniciar
+if (localStorage.getItem('darkMode') === 'true') {
+    document.body.classList.add('dark-mode');
+    const icon = document.getElementById('dark-mode-icon');
+    if (icon) icon.innerText = '☀️';
+}
+
+// ==================== CALENDARIO ====================
+let calendarioFechaActual = new Date();
+let vencimientosCalendario = {};
+
+async function cargarCalendario() {
+    const grid = document.getElementById('calendario-grid');
+    if (!grid) return;
+
+    const año = calendarioFechaActual.getFullYear();
+    const mes = calendarioFechaActual.getMonth();
+
+    // Actualizar título del mes
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    document.getElementById('calendario-mes-actual').innerText = `${meses[mes]} ${año}`;
+
+    // Cargar vencimientos del mes
+    await cargarVencimientosMes(año, mes);
+
+    // Generar calendario
+    const primerDia = new Date(año, mes, 1);
+    const ultimoDia = new Date(año, mes + 1, 0);
+    const diasEnMes = ultimoDia.getDate();
+    const primerDiaSemana = primerDia.getDay();
+
+    const hoy = new Date();
+    const hoyStr = hoy.toISOString().split('T')[0];
+
+    let html = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d =>
+        `<div class="calendario-header">${d}</div>`
+    ).join('');
+
+    // Días vacíos al inicio
+    for (let i = 0; i < primerDiaSemana; i++) {
+        html += '<div class="calendario-dia otro-mes"></div>';
+    }
+
+    // Días del mes
+    for (let dia = 1; dia <= diasEnMes; dia++) {
+        const fechaStr = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+        const esHoy = fechaStr === hoyStr;
+        const venc = vencimientosCalendario[fechaStr] || [];
+        const tieneVencimientos = venc.length > 0;
+        const vencidos = venc.some(v => v.vencido);
+
+        let clases = 'calendario-dia';
+        if (esHoy) clases += ' hoy';
+        if (tieneVencimientos && vencidos) clases += ' vencidos';
+        else if (tieneVencimientos) clases += ' con-vencimientos';
+
+        html += `
+            <div class="${clases}" onclick="mostrarVencimientosDia('${fechaStr}')">
+                <span class="num-dia">${dia}</span>
+                ${tieneVencimientos ? `<span class="num-vencimientos">${venc.length}</span>` : ''}
+            </div>
+        `;
+    }
+
+    grid.innerHTML = html;
+}
+
+async function cargarVencimientosMes(año, mes) {
+    vencimientosCalendario = {};
+
+    try {
+        const res = await fetch(`${API_URL}/clientes`);
+        if (!res.ok) return;
+
+        const clientes = await res.json();
+        const hoy = new Date().toISOString().split('T')[0];
+
+        for (const cliente of clientes) {
+            const prestamoRes = await fetch(`${API_URL}/prestamos/cliente/${cliente.id}`);
+            if (!prestamoRes.ok) continue;
+
+            const data = await prestamoRes.json();
+            if (!data.cuotas) continue;
+
+            data.cuotas.forEach(cuota => {
+                if (cuota.pagada) return;
+
+                const fechaVenc = cuota.fecha_vencimiento;
+                const [cAño, cMes] = fechaVenc.split('-').map(Number);
+
+                if (cAño === año && cMes - 1 === mes) {
+                    if (!vencimientosCalendario[fechaVenc]) {
+                        vencimientosCalendario[fechaVenc] = [];
+                    }
+                    vencimientosCalendario[fechaVenc].push({
+                        cliente: cliente.nombre,
+                        clienteId: cliente.id,
+                        telefono: cliente.telefono,
+                        cuota: cuota.numero_cuota,
+                        monto: cuota.saldo_pendiente,
+                        vencido: fechaVenc < hoy
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.error('Error cargando vencimientos:', err);
+    }
+}
+
+function cambiarMesCalendario(delta) {
+    calendarioFechaActual.setMonth(calendarioFechaActual.getMonth() + delta);
+    cargarCalendario();
+}
+
+function mostrarVencimientosDia(fecha) {
+    const venc = vencimientosCalendario[fecha] || [];
+    const container = document.getElementById('vencimientos-dia');
+    const titulo = document.getElementById('vencimientos-dia-titulo');
+    const lista = document.getElementById('lista-vencimientos-dia');
+
+    if (venc.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    titulo.innerText = `Vencimientos del ${fecha}`;
+    lista.innerHTML = venc.map(v => `
+        <div style="padding: 12px; border-left: 3px solid ${v.vencido ? 'var(--danger)' : 'var(--warning)'}; 
+                    margin-bottom: 10px; background: var(--bg-main); border-radius: 4px;">
+            <strong>${v.cliente}</strong> - Cuota ${v.cuota}<br>
+            <span style="color: ${v.vencido ? 'var(--danger)' : 'var(--text-secondary)'};">
+                S/ ${v.monto.toFixed(2)} ${v.vencido ? '(VENCIDO)' : ''}
+            </span>
+            ${v.telefono ? `
+                <button class="btn-small" style="margin-left: 10px;" 
+                    onclick="enviarRecordatorioWhatsApp('${v.telefono}', '${v.cliente}', ${v.cuota}, ${v.monto})">
+                    📱 WhatsApp
+                </button>
+            ` : ''}
+        </div>
+    `).join('');
+
+    container.style.display = 'block';
+}
+
+// ==================== RECORDATORIOS MASIVOS ====================
+async function enviarRecordatoriosMasivos() {
+    const mensaje = document.getElementById('mensaje-recordatorios');
+    mensaje.innerText = '⏳ Buscando clientes morosos...';
+    mensaje.className = 'mensaje';
+
+    try {
+        const res = await fetch(`${API_URL}/clientes`);
+        if (!res.ok) throw new Error('Error cargando clientes');
+
+        const clientes = await res.json();
+        const hoy = new Date().toISOString().split('T')[0];
+        let morosos = [];
+
+        for (const cliente of clientes) {
+            if (!cliente.telefono) continue;
+
+            const prestamoRes = await fetch(`${API_URL}/prestamos/cliente/${cliente.id}`);
+            if (!prestamoRes.ok) continue;
+
+            const data = await prestamoRes.json();
+            if (!data.cuotas) continue;
+
+            const cuotasVencidas = data.cuotas.filter(c => !c.pagada && c.fecha_vencimiento < hoy);
+            if (cuotasVencidas.length > 0) {
+                const totalDeuda = cuotasVencidas.reduce((sum, c) => sum + c.saldo_pendiente, 0);
+                morosos.push({
+                    nombre: cliente.nombre,
+                    telefono: cliente.telefono,
+                    cuotas: cuotasVencidas.length,
+                    deuda: totalDeuda
+                });
+            }
+        }
+
+        if (morosos.length === 0) {
+            mensaje.innerText = '✅ No hay clientes morosos para notificar';
+            mensaje.classList.add('exito');
+            return;
+        }
+
+        // Generar links de WhatsApp para cada moroso
+        const links = morosos.map(m => {
+            const texto = encodeURIComponent(
+                `Estimado(a) ${m.nombre}, le recordamos que tiene ${m.cuotas} cuota(s) pendiente(s) ` +
+                `por un total de S/ ${m.deuda.toFixed(2)}. Por favor acérquese a regularizar su situación. ` +
+                `Gracias - Capital Rise Loans`
+            );
+            return `https://wa.me/51${m.telefono}?text=${texto}`;
+        });
+
+        mensaje.innerHTML = `
+            <p>📱 Se encontraron <strong>${morosos.length}</strong> clientes morosos:</p>
+            <div style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
+                ${morosos.map((m, i) => `
+                    <div style="padding: 8px; border-bottom: 1px solid var(--border);">
+                        ${m.nombre} - S/ ${m.deuda.toFixed(2)} 
+                        <a href="${links[i]}" target="_blank" class="btn-small" style="font-size: 0.8em;">Enviar</a>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        mensaje.classList.add('exito');
+
+    } catch (err) {
+        console.error('Error:', err);
+        mensaje.innerText = '❌ Error al procesar recordatorios';
+        mensaje.classList.add('error');
+    }
+}
+
+function enviarRecordatorioWhatsApp(telefono, nombre, cuota, monto) {
+    const texto = encodeURIComponent(
+        `Estimado(a) ${nombre}, le recordamos que su cuota #${cuota} por S/ ${monto.toFixed(2)} ` +
+        `se encuentra pendiente de pago. Por favor acérquese a regularizar. Gracias - Capital Rise Loans`
+    );
+    window.open(`https://wa.me/51${telefono}?text=${texto}`, '_blank');
+}
+
+// ==================== ESTADO DE CUENTA PDF ====================
+async function generarEstadoCuentaPDF(clienteId, clienteNombre, clienteDoc) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Obtener datos del préstamo
+    const res = await fetch(`${API_URL}/prestamos/cliente/${clienteId}`);
+    if (!res.ok) {
+        mostrarToast('Error cargando datos del préstamo', 'error');
+        return;
+    }
+
+    const data = await res.json();
+    if (!data.prestamo || !data.cuotas) {
+        mostrarToast('No hay préstamo activo para este cliente', 'warning');
+        return;
+    }
+
+    const margen = 15;
+    let y = 15;
+
+    // Cabecera
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('CAPITAL RISE LOANS S.A.C.', 105, y, { align: 'center' });
+
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    y += 7;
+    doc.text('R.U.C. 20612345678 | Av. Javier Prado Este 4200, San Isidro', 105, y, { align: 'center' });
+
+    y += 12;
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('ESTADO DE CUENTA', 105, y, { align: 'center' });
+
+    // Datos del cliente
+    y += 15;
+    doc.setFontSize(10);
+    doc.text('DATOS DEL CLIENTE', margen, y);
+    doc.line(margen, y + 2, 195, y + 2);
+
+    y += 10;
+    doc.setFont(undefined, 'normal');
+    doc.text(`Cliente: ${clienteNombre}`, margen, y);
+    doc.text(`Documento: ${clienteDoc}`, 120, y);
+
+    y += 7;
+    doc.text(`Monto Préstamo: S/ ${data.prestamo.monto_total}`, margen, y);
+    doc.text(`Cuotas: ${data.prestamo.cuotas}`, 120, y);
+
+    y += 7;
+    doc.text(`Fecha Emisión: ${new Date().toLocaleDateString('es-PE')}`, margen, y);
+
+    // Tabla de cuotas
+    y += 15;
+    doc.setFont(undefined, 'bold');
+    doc.text('CRONOGRAMA DE PAGOS', margen, y);
+    doc.line(margen, y + 2, 195, y + 2);
+
+    y += 10;
+    // Cabecera de tabla
+    doc.setFillColor(26, 54, 93);
+    doc.rect(margen, y - 5, 180, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.text('N°', margen + 5, y);
+    doc.text('VENCIMIENTO', margen + 20, y);
+    doc.text('MONTO', margen + 60, y);
+    doc.text('PAGADO', margen + 95, y);
+    doc.text('SALDO', margen + 130, y);
+    doc.text('ESTADO', margen + 160, y);
+
+    doc.setTextColor(0, 0, 0);
+    y += 8;
+
+    const hoy = new Date().toISOString().split('T')[0];
+    let totalPagado = 0;
+    let totalPendiente = 0;
+
+    data.cuotas.forEach((cuota, index) => {
+        const vencida = cuota.fecha_vencimiento < hoy && !cuota.pagada;
+        const estado = cuota.pagada ? 'PAGADA' : (vencida ? 'VENCIDA' : 'PENDIENTE');
+
+        if (cuota.pagada) {
+            totalPagado += cuota.monto_cuota;
+        } else {
+            totalPendiente += cuota.saldo_pendiente;
+        }
+
+        if (vencida) {
+            doc.setFillColor(255, 230, 230);
+            doc.rect(margen, y - 4, 180, 7, 'F');
+        } else if (index % 2 === 0) {
+            doc.setFillColor(245, 247, 250);
+            doc.rect(margen, y - 4, 180, 7, 'F');
+        }
+
+        doc.setFontSize(8);
+        doc.text(String(cuota.numero_cuota), margen + 5, y);
+        doc.text(cuota.fecha_vencimiento, margen + 20, y);
+        doc.text(`S/ ${cuota.monto_cuota.toFixed(2)}`, margen + 60, y);
+        doc.text(`S/ ${(cuota.monto_cuota - cuota.saldo_pendiente).toFixed(2)}`, margen + 95, y);
+        doc.text(`S/ ${cuota.saldo_pendiente.toFixed(2)}`, margen + 130, y);
+        doc.text(estado, margen + 160, y);
+
+        y += 7;
+    });
+
+    // Totales
+    y += 5;
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(10);
+    doc.line(margen, y, 195, y);
+    y += 8;
+    doc.text(`Total Pagado: S/ ${totalPagado.toFixed(2)}`, margen, y);
+    doc.text(`Total Pendiente: S/ ${totalPendiente.toFixed(2)}`, 120, y);
+
+    // Pie de página
+    y += 20;
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Generado el ${new Date().toLocaleString('es-PE')} - Sistema AGILE`, 105, y, { align: 'center' });
+
+    // Guardar
+    const nombreArchivo = `EstadoCuenta_${clienteDoc}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(nombreArchivo);
+    mostrarToast('Estado de cuenta generado', 'success');
+}
+
+// Actualizar mostrarSeccion para incluir calendario
+const originalMostrarSeccion = mostrarSeccion;
+mostrarSeccion = function (id) {
+    // Llamar a la función original (definida antes)
+    const secciones = document.querySelectorAll('.seccion');
+    secciones.forEach(s => s.style.display = 'none');
+
+    const seccion = document.getElementById(`seccion-${id}`);
+    if (seccion) seccion.style.display = 'block';
+
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(b => b.classList.remove('active'));
+    navItems.forEach(btn => {
+        if (btn.onclick && btn.onclick.toString().includes(`'${id}'`)) {
+            btn.classList.add('active');
+        }
+    });
+
+    const titles = {
+        'dashboard': 'Dashboard',
+        'clientes': 'Gestión de Clientes',
+        'prestamos': 'Gestión de Préstamos',
+        'pagos': 'Cobranza',
+        'caja': 'Control de Caja',
+        'calendario': 'Calendario de Vencimientos',
+        'empleados': 'Gestión de Empleados',
+        'config': 'Configuración'
+    };
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) pageTitle.innerText = titles[id] || id;
+
+    const headerDate = document.getElementById('header-date');
+    if (headerDate) {
+        const hoy = new Date();
+        headerDate.innerText = hoy.toLocaleDateString('es-PE', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+    }
+
+    if (id === 'dashboard') cargarDashboard();
+    if (id === 'clientes') cargarClientes();
+    if (id === 'calendario') cargarCalendario();
+    if (id === 'empleados') cargarEmpleados();
+    if (id === 'config') cargarConfiguracion();
+};
