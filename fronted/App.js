@@ -27,25 +27,33 @@ function verificarSesion() {
 // La función iniciarSesion() está al final del archivo (módulo de empleados)
 
 function mostrarAplicacion(usuario) {
-    // Ocultar login y mostrar app
+    // Ocultar login y mostrar app con el nuevo layout
     document.getElementById('pantalla-login').style.display = 'none';
-    document.getElementById('app-principal').style.display = 'block';
+    document.getElementById('app-principal').style.display = 'flex';
 
     // Mostrar nombre del cajero
     const nombre = usuario.charAt(0).toUpperCase() + usuario.slice(1);
     const rol = localStorage.getItem('cajero_rol') || 'cajero';
-    document.getElementById('nombre-cajero').innerText = `${nombre} (${rol.toUpperCase()})`;
+
+    // Actualizar sidebar con info del usuario
+    const sidebarUserName = document.getElementById('sidebar-user-name');
+    const sidebarUserRole = document.getElementById('sidebar-user-role');
+    const userAvatar = document.getElementById('user-avatar');
+
+    if (sidebarUserName) sidebarUserName.innerText = nombre;
+    if (sidebarUserRole) sidebarUserRole.innerText = rol === 'admin' ? 'Administrador' : 'Operador';
+    if (userAvatar) userAvatar.innerText = nombre.charAt(0).toUpperCase();
 
     // CONTROL DE ROLES: Ocultar botones de Admin si es Cajero
     const botonesAdmin = document.querySelectorAll('.btn-admin');
     if (rol !== 'admin') {
         botonesAdmin.forEach(btn => btn.style.display = 'none');
     } else {
-        botonesAdmin.forEach(btn => btn.style.display = 'inline-block');
+        botonesAdmin.forEach(btn => btn.style.display = 'flex');
     }
 
-    // Cargar datos iniciales
-    cargarClientes();
+    // Cargar dashboard como sección inicial
+    mostrarSeccion('dashboard');
 }
 
 function cerrarSesion() {
@@ -65,17 +73,41 @@ function mostrarSeccion(id) {
     const seccion = document.getElementById(`seccion-${id}`);
     if (seccion) seccion.style.display = 'block';
 
-    // Actualizar botones de navegación
-    const botones = document.querySelectorAll('.nav-btn');
-    botones.forEach(b => b.classList.remove('active'));
+    // Actualizar botones de navegación del sidebar
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(b => b.classList.remove('active'));
 
-    // Botón específico para caja tiene su propia función, pero para otros:
-    const btnMap = {
-        'clientes': 0, 'prestamos': 1, 'pagos': 2, 'caja': 3, 'empleados': 4, 'config': 5
+    // Encontrar y activar el botón correcto
+    navItems.forEach(btn => {
+        if (btn.onclick && btn.onclick.toString().includes(`'${id}'`)) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Actualizar título de página
+    const titles = {
+        'dashboard': 'Dashboard',
+        'clientes': 'Gestión de Clientes',
+        'prestamos': 'Gestión de Préstamos',
+        'pagos': 'Cobranza',
+        'caja': 'Control de Caja',
+        'empleados': 'Gestión de Empleados',
+        'config': 'Configuración'
     };
-    if (botones[btnMap[id]]) botones[btnMap[id]].classList.add('active');
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) pageTitle.innerText = titles[id] || id;
+
+    // Actualizar fecha en header
+    const headerDate = document.getElementById('header-date');
+    if (headerDate) {
+        const hoy = new Date();
+        headerDate.innerText = hoy.toLocaleDateString('es-PE', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+    }
 
     // Cargar datos si es necesario
+    if (id === 'dashboard') cargarDashboard();
     if (id === 'clientes') cargarClientes();
     if (id === 'empleados') cargarEmpleados();
     if (id === 'config') cargarConfiguracion();
@@ -84,6 +116,97 @@ function mostrarSeccion(id) {
 function mostrarCaja() {
     mostrarSeccion('caja');
     cargarEstadoCaja();
+}
+
+// ==================== MÓDULO DASHBOARD ====================
+async function cargarDashboard() {
+    try {
+        // Cargar estadísticas
+        const [clientesRes, prestamosRes, cajaRes] = await Promise.all([
+            fetch(`${API_URL}/clientes`),
+            fetch(`${API_URL}/prestamos`),
+            fetch(`${API_URL}/caja/resumen-actual`).catch(() => ({ ok: false }))
+        ]);
+
+        // Total clientes
+        if (clientesRes.ok) {
+            const clientes = await clientesRes.json();
+            document.getElementById('stat-clientes').innerText = clientes.length;
+        }
+
+        // Préstamos activos
+        if (prestamosRes.ok) {
+            const prestamos = await prestamosRes.json();
+            const activos = prestamos.filter(p => !p.cancelado);
+            document.getElementById('stat-prestamos').innerText = activos.length;
+        }
+
+        // Cobrado hoy (si hay caja abierta)
+        if (cajaRes.ok) {
+            const caja = await cajaRes.json();
+            const totalHoy = (caja.EFECTIVO || 0) + (caja.YAPE || 0) + (caja.PLIN || 0) + (caja.TARJETA || 0);
+            document.getElementById('stat-cobrado').innerText = `S/ ${totalHoy.toFixed(2)}`;
+        }
+
+        // Cargar cuotas vencidas
+        await cargarCuotasVencidas();
+
+    } catch (err) {
+        console.error('Error cargando dashboard:', err);
+    }
+}
+
+async function cargarCuotasVencidas() {
+    try {
+        const res = await fetch(`${API_URL}/clientes`);
+        if (!res.ok) return;
+
+        const clientes = await res.json();
+        const hoy = new Date().toISOString().split('T')[0];
+        let morosos = 0;
+        let cuotasVencidas = [];
+
+        for (const cliente of clientes) {
+            const prestamoRes = await fetch(`${API_URL}/prestamos/cliente/${cliente.id}`);
+            if (!prestamoRes.ok) continue;
+
+            const data = await prestamoRes.json();
+            if (!data.cuotas) continue;
+
+            data.cuotas.forEach(cuota => {
+                if (!cuota.pagada && cuota.fecha_vencimiento < hoy) {
+                    const diasAtraso = Math.floor((new Date(hoy) - new Date(cuota.fecha_vencimiento)) / (1000 * 60 * 60 * 24));
+                    cuotasVencidas.push({
+                        cliente: cliente.nombre,
+                        cuota: cuota.numero_cuota,
+                        monto: cuota.saldo_pendiente,
+                        dias: diasAtraso
+                    });
+                }
+            });
+        }
+
+        // Actualizar contador de morosos
+        const clientesMorosos = [...new Set(cuotasVencidas.map(c => c.cliente))].length;
+        document.getElementById('stat-morosos').innerText = clientesMorosos;
+
+        // Mostrar lista de cuotas vencidas
+        const lista = document.getElementById('lista-cuotas-vencidas');
+        if (cuotasVencidas.length === 0) {
+            lista.innerHTML = '<p style="text-align: center; color: var(--secondary);">✅ No hay cuotas vencidas hoy</p>';
+        } else {
+            lista.innerHTML = cuotasVencidas.slice(0, 5).map(c => `
+                <div style="padding: 10px; border-left: 3px solid var(--danger); margin-bottom: 10px; background: rgba(229,62,62,0.05); border-radius: 4px;">
+                    <strong>${c.cliente}</strong> - Cuota ${c.cuota} - 
+                    <span style="color: var(--danger);">S/ ${c.monto.toFixed(2)}</span> - 
+                    <span style="font-size: 0.85em; color: var(--text-muted);">${c.dias} días de atraso</span>
+                </div>
+            `).join('');
+        }
+
+    } catch (err) {
+        console.error('Error cargando cuotas vencidas:', err);
+    }
 }
 
 // ==================== MÓDULO CLIENTES ====================
