@@ -1472,9 +1472,23 @@ body.dark-mode .tabla-clientes th {
 body.dark-mode input,
 body.dark-mode select,
 body.dark-mode textarea {
-    background: #1a202c;
-    color: #e2e8f0;
-    border-color: #4a5568;
+    background: #3d4a5c !important;
+    color: #ffffff !important;
+    border-color: #5a6b7e !important;
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+    color: #a0aec0 !important;
+    opacity: 1;
+}
+
+body.dark-mode input:focus,
+body.dark-mode select:focus,
+body.dark-mode textarea:focus {
+    border-color: #4a90d9 !important;
+    background: #4a5568 !important;
+    outline: none;
 }
 
 body.dark-mode .stat-card {
@@ -1482,8 +1496,8 @@ body.dark-mode .stat-card {
 }
 
 body.dark-mode .search-global input {
-    background: #2d3748;
-    color: #e2e8f0;
+    background: #3d4a5c !important;
+    color: #ffffff !important;
 }
 
 body.dark-mode .calendario-dia {
@@ -1494,6 +1508,7 @@ body.dark-mode .calendario-dia {
 body.dark-mode .calendario-dia:hover {
     background: #4a5568;
 }
+
 
 /* CRITICAL: Force dark text on light backgrounds in dark mode */
 body.dark-mode [style*="background: #f"],
@@ -1523,19 +1538,43 @@ body.dark-mode div[style*="#f8f9fa"] * {
     color: #e2e8f0 !important;
 }
 
-/* Tables in dark mode */
-body.dark-mode .tabla-clientes td {
-    color: #e2e8f0;
+/* Tables in dark mode - all cells should have light text */
+body.dark-mode .tabla-clientes td,
+body.dark-mode table td,
+body.dark-mode .modal-content td {
+    color: #e2e8f0 !important;
 }
 
-body.dark-mode .tabla-clientes tr:hover {
+body.dark-mode .tabla-clientes tr:hover,
+body.dark-mode table tr:hover {
     background: #3d4a5c;
+}
+
+/* Table rows with dark background should keep light text */
+body.dark-mode tr td {
+    color: #e2e8f0 !important;
+}
+
+/* Modal content styling */
+body.dark-mode .modal-content {
+    background: #2d3748 !important;
+    color: #e2e8f0 !important;
+}
+
+body.dark-mode .modal-content h2,
+body.dark-mode .modal-content h3,
+body.dark-mode .modal-content h4,
+body.dark-mode .modal-content h5,
+body.dark-mode .modal-content p,
+body.dark-mode .modal-content span,
+body.dark-mode .modal-content div {
+    color: #e2e8f0 !important;
 }
 
 /* Form elements */
 body.dark-mode .form-group label,
 body.dark-mode label {
-    color: #a0aec0;
+    color: #c0c8d4 !important;
 }
 
 body.dark-mode h4,
@@ -1543,6 +1582,7 @@ body.dark-mode h3,
 body.dark-mode h2 {
     color: #e2e8f0;
 }
+
 
 body.dark-mode .mensaje {
     color: #e2e8f0;
