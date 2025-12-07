@@ -36,6 +36,14 @@ function mostrarAplicacion(usuario) {
     const rol = localStorage.getItem('cajero_rol') || 'cajero';
     document.getElementById('nombre-cajero').innerText = `${nombre} (${rol.toUpperCase()})`;
 
+    // CONTROL DE ROLES: Ocultar botones de Admin si es Cajero
+    const botonesAdmin = document.querySelectorAll('.btn-admin');
+    if (rol !== 'admin') {
+        botonesAdmin.forEach(btn => btn.style.display = 'none');
+    } else {
+        botonesAdmin.forEach(btn => btn.style.display = 'inline-block');
+    }
+
     // Cargar datos iniciales
     cargarClientes();
 }
@@ -63,13 +71,14 @@ function mostrarSeccion(id) {
 
     // Botón específico para caja tiene su propia función, pero para otros:
     const btnMap = {
-        'clientes': 0, 'prestamos': 1, 'pagos': 2, 'caja': 3, 'empleados': 4
+        'clientes': 0, 'prestamos': 1, 'pagos': 2, 'caja': 3, 'empleados': 4, 'config': 5
     };
     if (botones[btnMap[id]]) botones[btnMap[id]].classList.add('active');
 
     // Cargar datos si es necesario
     if (id === 'clientes') cargarClientes();
     if (id === 'empleados') cargarEmpleados();
+    if (id === 'config') cargarConfiguracion();
 }
 
 function mostrarCaja() {
@@ -1279,4 +1288,116 @@ function exportarClientesCSV() {
     link.click();
 
     mostrarToast('📄 Archivo CSV descargado', 'success');
+}
+
+// ==================== CONFIGURACIÓN DEL SISTEMA ====================
+function cargarConfiguracion() {
+    // Cargar mora desde localStorage (o default 1%)
+    const moraPorcentaje = localStorage.getItem('config_mora') || '1';
+    document.getElementById('config-mora-porcentaje').value = moraPorcentaje;
+
+    // Mostrar info del sistema
+    document.getElementById('config-servidor-url').innerText = API_URL || window.location.origin;
+    document.getElementById('config-usuario-actual').innerText = localStorage.getItem('cajero_usuario') || '-';
+    document.getElementById('config-rol-actual').innerText = (localStorage.getItem('cajero_rol') || 'cajero').toUpperCase();
+}
+
+function guardarConfigMora() {
+    const porcentaje = parseFloat(document.getElementById('config-mora-porcentaje').value);
+
+    if (isNaN(porcentaje) || porcentaje < 0 || porcentaje > 100) {
+        mostrarToast('❌ Ingrese un porcentaje válido (0-100)', 'error');
+        return;
+    }
+
+    localStorage.setItem('config_mora', porcentaje.toString());
+    mostrarToast(`✅ Mora actualizada a ${porcentaje}%`, 'success');
+
+    document.getElementById('mensaje-config').innerText = `✅ Configuración guardada. Nueva mora: ${porcentaje}%`;
+    document.getElementById('mensaje-config').classList.add('exito');
+}
+
+// Función helper para obtener el porcentaje de mora configurado
+function obtenerPorcentajeMora() {
+    return parseFloat(localStorage.getItem('config_mora') || '1') / 100;
+}
+
+// ==================== ESTADO DE CUENTA DEL CLIENTE ====================
+function verEstadoCuenta() {
+    if (!prestamoActivo) {
+        mostrarToast('Primero busque un cliente', 'warning');
+        return;
+    }
+
+    const { prestamo, cuotas } = prestamoActivo;
+
+    // Actualizar título
+    document.getElementById('estado-cuenta-cliente').innerText = prestamo.cliente_nombre;
+
+    // Calcular resumen
+    const cuotasPagadas = cuotas.filter(c => c.pagada).length;
+    const cuotasPendientes = cuotas.filter(c => !c.pagada).length;
+    const totalPagado = cuotas.filter(c => c.pagada).reduce((sum, c) => sum + c.monto_cuota, 0);
+    const totalPendiente = cuotas.filter(c => !c.pagada).reduce((sum, c) => sum + c.saldo_pendiente, 0);
+
+    document.getElementById('estado-cuenta-resumen').innerHTML = `
+        <div style="display: flex; justify-content: space-around; text-align: center;">
+            <div>
+                <div style="font-size: 2em; font-weight: bold; color: #27ae60;">${cuotasPagadas}</div>
+                <div>Cuotas Pagadas</div>
+            </div>
+            <div>
+                <div style="font-size: 2em; font-weight: bold; color: #e74c3c;">${cuotasPendientes}</div>
+                <div>Cuotas Pendientes</div>
+            </div>
+            <div>
+                <div style="font-size: 1.5em; font-weight: bold; color: #2c3e50;">S/ ${totalPendiente.toFixed(2)}</div>
+                <div>Deuda Total</div>
+            </div>
+        </div>
+    `;
+
+    // Llenar tabla
+    const tbody = document.getElementById('estado-cuenta-lista');
+    tbody.innerHTML = '';
+
+    const hoy = new Date().toISOString().split('T')[0];
+
+    cuotas.forEach(cuota => {
+        const vencida = cuota.fecha_vencimiento < hoy && !cuota.pagada;
+        let estado = '';
+        let detalle = '';
+
+        if (cuota.pagada) {
+            estado = '<span style="color: #27ae60; font-weight: bold;">✅ PAGADA</span>';
+            detalle = 'A tiempo';
+        } else if (vencida) {
+            const fechaVenc = new Date(cuota.fecha_vencimiento);
+            const diasAtraso = Math.floor((new Date(hoy) - fechaVenc) / (1000 * 60 * 60 * 24));
+            estado = `<span style="color: #e74c3c; font-weight: bold;">🔴 VENCIDA</span>`;
+            detalle = `${diasAtraso} días de atraso`;
+        } else {
+            estado = '<span style="color: #f39c12;">⏳ Pendiente</span>';
+            detalle = 'Por vencer';
+        }
+
+        const row = document.createElement('tr');
+        if (vencida) row.style.backgroundColor = '#ffebee';
+        if (cuota.pagada) row.style.backgroundColor = '#e8f5e9';
+
+        row.innerHTML = `
+            <td>${cuota.fecha_vencimiento}</td>
+            <td>Cuota ${cuota.numero_cuota}</td>
+            <td>S/ ${cuota.monto_cuota}</td>
+            <td>${estado}</td>
+            <td>${detalle}</td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    document.getElementById('modal-estado-cuenta').style.display = 'flex';
+}
+
+function cerrarEstadoCuenta() {
+    document.getElementById('modal-estado-cuenta').style.display = 'none';
 }

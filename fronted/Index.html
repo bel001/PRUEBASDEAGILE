@@ -68,6 +68,8 @@
                 <button class="nav-btn" onclick="mostrarSeccion('pagos')">💳 Cobranza</button>
                 <button class="nav-btn" onclick="mostrarCaja()">🏦 Caja</button>
                 <button class="nav-btn" onclick="mostrarSeccion('empleados')">👥 Empleados</button>
+                <button class="nav-btn btn-admin" onclick="mostrarSeccion('config')" style="background: #9b59b6;">⚙️
+                    Config</button>
             </nav>
 
             <!-- SECCIÓN CLIENTES -->
@@ -225,6 +227,45 @@
                 </div>
             </div>
 
+            <!-- MODAL ESTADO DE CUENTA (NUEVO) -->
+            <div id="modal-estado-cuenta"
+                style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+                <div
+                    style="background: white; width: 95%; max-width: 800px; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        <h3 style="margin: 0;">📋 Estado de Cuenta - <span id="estado-cuenta-cliente">Cliente</span>
+                        </h3>
+                        <button onclick="cerrarEstadoCuenta()"
+                            style="background: none; border: none; font-size: 1.5em; cursor: pointer;">✕</button>
+                    </div>
+
+                    <div id="estado-cuenta-resumen"
+                        style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <!-- Resumen dinámico -->
+                    </div>
+
+                    <table class="tabla-clientes" id="tabla-estado-cuenta">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Cuota #</th>
+                                <th>Monto</th>
+                                <th>Estado</th>
+                                <th>Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody id="estado-cuenta-lista">
+                            <!-- Filas dinámicas -->
+                        </tbody>
+                    </table>
+
+                    <div style="text-align: right; margin-top: 15px;">
+                        <button class="btn-secondary" onclick="cerrarEstadoCuenta()">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- SECCIÓN PAGOS / COBRANZA -->
             <div id="seccion-pagos" class="seccion" style="display:none;">
                 <div class="card">
@@ -248,6 +289,10 @@
                                         id="pago-cliente-nombre"></span></p>
                                 <p style="margin: 5px 0;"><strong>Préstamo:</strong> S/ <span
                                         id="pago-monto-total"></span> en <span id="pago-num-cuotas"></span> cuotas</p>
+                                <button class="btn-small" style="background: #3498db; margin-top: 10px;"
+                                    onclick="verEstadoCuenta()">
+                                    📋 Ver Estado de Cuenta Completo
+                                </button>
                             </div>
 
                             <div class="form-group">
@@ -474,6 +519,44 @@
                             </thead>
                             <tbody id="listaEmpleados"></tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN CONFIGURACIÓN (SOLO ADMIN) -->
+            <div id="seccion-config" class="seccion" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>⚙️ Configuración del Sistema</h3>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- Parámetros de Mora -->
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <h4>📊 Parámetros de Mora</h4>
+                            <div class="form-group">
+                                <label>Porcentaje de Mora Diaria (%):</label>
+                                <div class="input-group">
+                                    <input type="number" id="config-mora-porcentaje" step="0.01" min="0" max="100"
+                                        value="1" style="width: 100px;">
+                                    <span style="padding: 10px;">%</span>
+                                    <button class="btn-secondary" onclick="guardarConfigMora()">💾 Guardar</button>
+                                </div>
+                                <small style="color: #666;">Actualmente: La mora se calcula como [Saldo Pendiente] ×
+                                    [Porcentaje/100]</small>
+                            </div>
+                        </div>
+
+                        <!-- Info del Sistema -->
+                        <div style="background: #e8f4fd; padding: 20px; border-radius: 8px;">
+                            <h4>ℹ️ Información del Sistema</h4>
+                            <p><strong>Versión:</strong> 2.0 - AGILE Préstamos</p>
+                            <p><strong>Servidor:</strong> <span id="config-servidor-url">-</span></p>
+                            <p><strong>Usuario Actual:</strong> <span id="config-usuario-actual">-</span></p>
+                            <p><strong>Rol:</strong> <span id="config-rol-actual">-</span></p>
+                        </div>
+
+                        <div id="mensaje-config" class="mensaje" style="margin-top: 15px;"></div>
                     </div>
                 </div>
             </div>
