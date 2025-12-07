@@ -1488,46 +1488,59 @@ body.dark-mode .search-global input {
 
 body.dark-mode .calendario-dia {
     background: #2d3748;
+    color: #e2e8f0;
 }
 
 body.dark-mode .calendario-dia:hover {
     background: #4a5568;
 }
 
-/* Improve text visibility in dark mode */
-body.dark-mode .card-body {
-    color: #e2e8f0;
-}
-
-body.dark-mode .card-body p,
-body.dark-mode .card-body span,
-body.dark-mode .card-body div,
-body.dark-mode .card-body label,
-body.dark-mode .card-body strong {
-    color: #e2e8f0 !important;
-}
-
+/* CRITICAL: Force dark text on light backgrounds in dark mode */
+body.dark-mode [style*="background: #f"],
+body.dark-mode [style*="background:#f"],
+body.dark-mode [style*="background: white"],
+body.dark-mode [style*="background:white"],
+body.dark-mode [style*="background-color: #f"],
+body.dark-mode [style*="background-color:#f"],
 body.dark-mode .resultado-cliente,
-body.dark-mode .info-cliente {
+body.dark-mode .info-cliente,
+body.dark-mode div[style*="#e8f4fd"],
+body.dark-mode div[style*="#f8f9fa"],
+body.dark-mode div[style*="rgb(248"],
+body.dark-mode div[style*="rgb(232"] {
     background: #3d4a5c !important;
     color: #e2e8f0 !important;
 }
 
+body.dark-mode [style*="background: #f"] *,
+body.dark-mode [style*="background:#f"] *,
+body.dark-mode [style*="background: white"] *,
+body.dark-mode [style*="background-color: #f"] *,
 body.dark-mode .resultado-cliente *,
-body.dark-mode .info-cliente * {
+body.dark-mode .info-cliente *,
+body.dark-mode div[style*="#e8f4fd"] *,
+body.dark-mode div[style*="#f8f9fa"] * {
     color: #e2e8f0 !important;
 }
 
+/* Tables in dark mode */
 body.dark-mode .tabla-clientes td {
     color: #e2e8f0;
 }
 
-body.dark-mode .form-group label {
+body.dark-mode .tabla-clientes tr:hover {
+    background: #3d4a5c;
+}
+
+/* Form elements */
+body.dark-mode .form-group label,
+body.dark-mode label {
     color: #a0aec0;
 }
 
 body.dark-mode h4,
-body.dark-mode h3 h2 {
+body.dark-mode h3,
+body.dark-mode h2 {
     color: #e2e8f0;
 }
 
@@ -1538,4 +1551,186 @@ body.dark-mode .mensaje {
 body.dark-mode select option {
     background: #2d3748;
     color: #e2e8f0;
+}
+
+body.dark-mode small {
+    color: #a0aec0 !important;
+}
+
+/* Calendar header in dark mode */
+body.dark-mode .calendario-header {
+    background: #4a90d9;
+}
+
+body.dark-mode .card-body {
+    background: #2d3748;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* ==================== MOBILE RESPONSIVE ==================== */
+@media (max-width: 992px) {
+    .sidebar {
+        width: 70px;
+        overflow: visible;
+    }
+
+    .sidebar-header h2,
+    .sidebar-header span {
+        display: none;
+    }
+
+    .nav-item span:not(.nav-icon) {
+        display: none;
+    }
+
+    .sidebar-footer .user-name,
+    .sidebar-footer .user-role {
+        display: none;
+    }
+
+    .main-content {
+        margin-left: 70px;
+    }
+
+    .calendario-container {
+        gap: 3px;
+    }
+
+    .calendario-dia {
+        font-size: 0.85em;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: 0;
+        transform: translateX(-100%);
+        width: var(--sidebar-width);
+        transition: transform 0.3s;
+        z-index: 1000;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .content-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .header-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .search-global input {
+        width: 100%;
+    }
+
+    .calendario-container {
+        gap: 2px;
+    }
+
+    .calendario-dia {
+        padding: 5px;
+        font-size: 0.75em;
+        aspect-ratio: auto;
+        min-height: 40px;
+    }
+
+    .calendario-header {
+        padding: 5px;
+        font-size: 0.7em;
+    }
+
+    .card-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .btn-small {
+        font-size: 0.8em;
+        padding: 6px 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .main-content {
+        padding: 10px;
+    }
+
+    .card-body {
+        padding: 12px;
+    }
+
+    .tabla-clientes th,
+    .tabla-clientes td {
+        padding: 8px 6px;
+        font-size: 0.8em;
+    }
+
+    .calendario-dia {
+        min-height: 35px;
+        font-size: 0.7em;
+    }
+
+    .calendario-dia .num-vencimientos {
+        display: none;
+    }
+
+    .input-group {
+        flex-direction: column;
+    }
+
+    .input-group input,
+    .input-group select {
+        width: 100%;
+    }
+}
+
+/* Ensure calendar grid always displays */
+.calendario-container {
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    min-height: 200px;
+}
+
+/* Mobile menu toggle */
+.menu-toggle {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1001;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .menu-toggle {
+        display: block;
+    }
 }
