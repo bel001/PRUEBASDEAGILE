@@ -168,18 +168,19 @@ body {
 }
 
 .nav-item {
-    display: flex;
+    display: flex !important;
     align-items: center;
     padding: 14px 25px;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.85) !important;
     text-decoration: none;
     transition: all 0.3s;
     cursor: pointer;
     border: none;
-    background: none;
+    background: transparent;
     width: 100%;
     font-size: 0.95em;
     font-family: inherit;
+    text-align: left;
 }
 
 .nav-item:hover {
