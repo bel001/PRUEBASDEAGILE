@@ -1,25 +1,65 @@
 /* ==================== VARIABLES PRINCIPALES ==================== */
 :root {
-    --primary: #1a365d;
-    --primary-light: #2c5282;
-    --primary-dark: #0d1b2a;
-    --secondary: #38a169;
-    --secondary-dark: #276749;
-    --accent: #d69e2e;
-    --accent-light: #ecc94b;
-    --danger: #e53e3e;
-    --warning: #dd6b20;
-    --bg-main: #f7fafc;
+    /* Primary Colors - Elegant Blue */
+    --primary: #1e3a5f;
+    --primary-light: #2d5a8a;
+    --primary-dark: #0f1f33;
+
+    /* Secondary - Success Green */
+    --secondary: #10b981;
+    --secondary-dark: #059669;
+    --secondary-light: #34d399;
+
+    /* Accent - Golden */
+    --accent: #f59e0b;
+    --accent-light: #fbbf24;
+
+    /* Status Colors */
+    --danger: #ef4444;
+    --danger-light: #fca5a5;
+    --warning: #f97316;
+    --info: #3b82f6;
+
+    /* Backgrounds */
+    --bg-main: #f8fafc;
     --bg-card: #ffffff;
-    --text-primary: #1a202c;
-    --text-secondary: #4a5568;
-    --text-muted: #718096;
+    --bg-elevated: #ffffff;
+
+    /* Text */
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --text-light: #cbd5e1;
+
+    /* Borders */
     --border: #e2e8f0;
-    --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.12);
+    --border-light: #f1f5f9;
+
+    /* Shadows - More Refined */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
+    --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.15);
+
+    /* Glass Effect */
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.2);
+
+    /* Radius */
+    --radius-sm: 8px;
     --radius: 12px;
     --radius-lg: 16px;
+    --radius-xl: 24px;
+
+    /* Spacing */
     --sidebar-width: 260px;
+
+    /* Transitions */
+    --transition-fast: 0.15s ease;
+    --transition: 0.25s ease;
+    --transition-slow: 0.4s ease;
 }
 
 /* ==================== RESET Y BASE ==================== */
@@ -29,12 +69,23 @@
     box-sizing: border-box;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
 body {
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
     background-color: var(--bg-main);
     color: var(--text-primary);
-    line-height: 1.6;
+    line-height: 1.65;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
+
+/* Google Fonts - Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 
 /* ==================== LOGIN ==================== */
 .login-overlay {
@@ -1440,65 +1491,95 @@ body.dark-mode .calendario-dia {
     margin-top: 2px;
 }
 
-/* ==================== MODO OSCURO ==================== */
+/* ==================== MODO OSCURO - ENHANCED ==================== */
 body.dark-mode {
-    --primary: #4a90d9;
-    --primary-light: #6aa3e0;
-    --primary-dark: #2c5282;
-    --bg-main: #1a202c;
-    --bg-card: #2d3748;
-    --text-primary: #e2e8f0;
-    --text-secondary: #a0aec0;
-    --text-muted: #718096;
-    --border: #4a5568;
+    /* Primary - Brighter blue for dark mode */
+    --primary: #60a5fa;
+    --primary-light: #93c5fd;
+    --primary-dark: #3b82f6;
+
+    /* Secondary - Vibrant green */
+    --secondary: #34d399;
+    --secondary-dark: #10b981;
+    --secondary-light: #6ee7b7;
+
+    /* Backgrounds - Layered grays */
+    --bg-main: #0f172a;
+    --bg-card: #1e293b;
+    --bg-elevated: #334155;
+
+    /* Text - High contrast */
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-light: #64748b;
+
+    /* Borders */
+    --border: #475569;
+    --border-light: #334155;
+
+    /* Shadows for dark mode */
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
 
+
 body.dark-mode .sidebar {
-    background: linear-gradient(180deg, #0d1b2a 0%, #1a365d 100%);
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    border-right: 1px solid var(--border);
 }
 
 body.dark-mode .login-overlay {
-    background: linear-gradient(135deg, #1a365d 0%, #2c5282 50%, #276749 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #064e3b 100%);
+}
+
+body.dark-mode .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
 }
 
 body.dark-mode .card-header {
-    background: linear-gradient(135deg, #2c5282 0%, #4a90d9 100%);
+    background: linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%);
 }
 
 body.dark-mode .tabla-clientes th {
-    background: linear-gradient(135deg, #2c5282 0%, #4a90d9 100%);
+    background: linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%);
 }
 
+/* Dark mode inputs with better visibility */
 body.dark-mode input,
 body.dark-mode select,
 body.dark-mode textarea {
-    background: #3d4a5c !important;
-    color: #ffffff !important;
-    border-color: #5a6b7e !important;
+    background: var(--bg-elevated) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
 }
 
 body.dark-mode input::placeholder,
 body.dark-mode textarea::placeholder {
-    color: #a0aec0 !important;
+    color: var(--text-muted) !important;
     opacity: 1;
 }
 
 body.dark-mode input:focus,
 body.dark-mode select:focus,
 body.dark-mode textarea:focus {
-    border-color: #4a90d9 !important;
-    background: #4a5568 !important;
+    border-color: var(--primary) !important;
+    background: #3d4752 !important;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2) !important;
     outline: none;
 }
 
 body.dark-mode .stat-card {
-    background: #2d3748;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
 }
 
 body.dark-mode .search-global input {
-    background: #3d4a5c !important;
-    color: #ffffff !important;
+    background: var(--bg-elevated) !important;
+    color: var(--text-primary) !important;
 }
+
 
 body.dark-mode .calendario-container {
     background: #1a202c !important;
