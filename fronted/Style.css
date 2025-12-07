@@ -1596,6 +1596,7 @@ body.dark-mode .info-prestamo {
     color: #1a202c !important;
 }
 
+/* ALL elements with light backgrounds need dark text */
 body.dark-mode div[style*="background: #e"] *,
 body.dark-mode div[style*="background:#e"] *,
 body.dark-mode div[style*="background: #f"] *,
@@ -1603,9 +1604,34 @@ body.dark-mode div[style*="background:#f"] *,
 body.dark-mode div[style*="#e8f4fd"] *,
 body.dark-mode div[style*="#f8f9fa"] *,
 body.dark-mode div[style*="#fff3e0"] *,
+body.dark-mode div[style*="#fff"] *,
+body.dark-mode div[style*="white"] *,
 body.dark-mode .resultado-cliente *,
-body.dark-mode .info-prestamo * {
+body.dark-mode .info-prestamo *,
+body.dark-mode .info-cliente *,
+body.dark-mode #resultado-cliente *,
+body.dark-mode #info-cliente-prestamo *,
+body.dark-mode #resultado-busqueda-pago * {
     color: #1a202c !important;
+}
+
+/* Light background divs themselves */
+body.dark-mode .resultado-cliente,
+body.dark-mode .info-prestamo,
+body.dark-mode .info-cliente,
+body.dark-mode #resultado-cliente,
+body.dark-mode #info-cliente-prestamo,
+body.dark-mode #resultado-busqueda-pago {
+    color: #1a202c !important;
+}
+
+/* Strong and bold elements */
+body.dark-mode .resultado-cliente strong,
+body.dark-mode .info-prestamo strong,
+body.dark-mode #resultado-cliente strong,
+body.dark-mode #info-cliente-prestamo strong,
+body.dark-mode #resultado-busqueda-pago strong {
+    color: #2d3748 !important;
 }
 
 /* Badge fixes - keep their colors */
@@ -1758,23 +1784,38 @@ body.dark-mode .badge-pagada {
 
 /* ==================== CALENDAR SECTION ==================== */
 #seccion-calendario {
-    max-height: calc(100vh - 120px);
-    overflow-y: auto;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 #seccion-calendario .card {
+    width: 100%;
     margin-bottom: 15px;
 }
 
 #seccion-calendario .card-body {
     padding: 10px;
+    width: 100%;
 }
 
 #seccion-calendario .card-header {
-    padding: 12px 20px;
+    padding: 12px 15px;
+    flex-wrap: wrap;
 }
 
-/* ==================== CALENDAR GRID ==================== */
+/* ==================== CALENDAR GRID RESPONSIVE ==================== */
+.calendario-container {
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    padding: 8px;
+    background: var(--bg-main);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 100%;
+}
+
 .calendario-container {
     display: grid !important;
     grid-template-columns: repeat(7, 1fr);
