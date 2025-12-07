@@ -22,6 +22,9 @@ router.post('/crear-preferencia', async (req, res) => {
             return res.status(400).json({ error: 'Faltan datos obligatorios' });
         }
 
+        // URL base - usar producción para MercadoPago (requiere HTTPS)
+        const BASE_URL = process.env.FRONTEND_URL || 'https://agile-prestamos-nn7p.onrender.com';
+
         // Crear preferencia de pago
         const preferenceData = {
             items: [
@@ -37,13 +40,12 @@ router.post('/crear-preferencia', async (req, res) => {
                 email: cliente_email || 'cliente@example.com'
             },
             back_urls: {
-                success: `${process.env.FRONTEND_URL || 'http://localhost:4000'}/pago-exitoso.html?cuota_id=${cuota_id}`,
-                failure: `${process.env.FRONTEND_URL || 'http://localhost:4000'}/pago-fallido.html`,
-                pending: `${process.env.FRONTEND_URL || 'http://localhost:4000'}/pago-pendiente.html`
+                success: `${BASE_URL}?pago=exitoso&cuota_id=${cuota_id}`,
+                failure: `${BASE_URL}?pago=fallido`,
+                pending: `${BASE_URL}?pago=pendiente`
             },
-            auto_return: 'approved',
             external_reference: cuota_id, // Para identificar el pago en webhook
-            notification_url: `${process.env.BACKEND_URL || 'https://agile-prestamos-nn7p.onrender.com'}/mercadopago/webhook`,
+            notification_url: `${BASE_URL}/mercadopago/webhook`,
             statement_descriptor: 'AGILE Prestamos'
         };
 
