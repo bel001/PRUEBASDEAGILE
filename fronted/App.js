@@ -9,6 +9,28 @@ const API_URL = (window.location.hostname === 'localhost' || window.location.pro
 // Validar sesión al cargar la página
 document.addEventListener('DOMContentLoaded', function () {
     verificarSesion();
+
+    // Detectar callback de MercadoPago
+    const urlParams = new URLSearchParams(window.location.search);
+    const pagoStatus = urlParams.get('pago');
+
+    if (pagoStatus === 'exitoso') {
+        setTimeout(() => {
+            mostrarToast('✅ Pago procesado exitosamente vía MercadoPago. El comprobante se generó automáticamente.', 'success');
+            // Limpiar URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }, 1500);
+    } else if (pagoStatus === 'fallido') {
+        setTimeout(() => {
+            mostrarToast('❌ El pago no pudo ser procesado. Intente nuevamente.', 'error');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }, 1500);
+    } else if (pagoStatus === 'pendiente') {
+        setTimeout(() => {
+            mostrarToast('⏳ Pago pendiente de confirmación.', 'warning');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }, 1500);
+    }
 });
 
 function verificarSesion() {

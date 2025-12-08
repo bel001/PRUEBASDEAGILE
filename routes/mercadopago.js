@@ -85,30 +85,66 @@ router.post('/webhook', async (req, res) => {
                 const cuota_id = paymentInfo.external_reference;
                 const monto_pagado = paymentInfo.transaction_amount;
 
-                // Registrar pago en nuestra base de datos
+                // Obtener cuota
                 const cuotaRef = db.collection('cuotas').doc(cuota_id);
                 const cuotaSnap = await cuotaRef.get();
 
                 if (cuotaSnap.exists) {
                     const cuota = cuotaSnap.data();
-                    const nuevo_saldo = Math.max(0, cuota.saldo_pendiente - monto_pagado);
+
+                    // Importar lógica de cálculo de mora
+                    const { calcularMora, esVencida } = require('../services/moraService');
+
+                    // Calcular mora y distribución del pago
+                    const vencida = esVencida(cuota.fecha_vencimiento);
+                    const moraCalculada = calcularMora(cuota.saldo_pendiente, vencida);
+                    const total_con_mora = cuota.saldo_pendiente + moraCalculada;
+
+                    let abono_capital = 0;
+                    let abono_mora = 0;
+
+                    if (monto_pagado >= total_con_mora) {
+                        // PAGO TOTAL: Cubre Mora + Capital
+                        abono_mora = moraCalculada;
+                        abono_capital = cuota.saldo_pendiente;
+                    } else {
+                        // PAGO PARCIAL: Mora anulada, todo a capital
+                        abono_mora = 0;
+                        abono_capital = Math.min(monto_pagado, cuota.saldo_pendiente);
+                    }
+
+                    const nuevo_saldo = Number((cuota.saldo_pendiente - abono_capital).toFixed(2));
                     const pagada = nuevo_saldo <= 0;
 
+                    const batch = db.batch();
+
                     // Crear registro de pago
-                    await db.collection('pagos').add({
+                    const pagoRef = db.collection('pagos').doc();
+                    const pagoData = {
                         cuota_id,
                         fecha_pago: new Date().toISOString(),
                         monto_pagado,
+                        monto_recibido: monto_pagado,
                         medio_pago: 'MERCADOPAGO',
                         mp_payment_id: paymentId,
-                        estado: 'APROBADO'
-                    });
+                        estado: 'APROBADO',
+                        desglose: {
+                            capital: abono_capital,
+                            mora: abono_mora
+                        },
+                        // Datos del cliente para el comprobante
+                        payer_email: paymentInfo.payer?.email || '',
+                        payer_name: paymentInfo.payer?.first_name || 'Cliente MercadoPago'
+                    };
+                    batch.set(pagoRef, pagoData);
 
                     // Actualizar cuota
-                    await cuotaRef.update({
+                    batch.update(cuotaRef, {
                         saldo_pendiente: nuevo_saldo,
                         pagada: pagada
                     });
+
+                    await batch.commit();
 
                     // Si todas las cuotas están pagadas, marcar préstamo como cancelado
                     if (pagada) {
@@ -131,7 +167,7 @@ router.post('/webhook', async (req, res) => {
                         }
                     }
 
-                    console.log(`✅ Pago MercadoPago registrado para cuota ${cuota_id}`);
+                    console.log(`✅ Pago MercadoPago registrado: Capital S/${abono_capital}, Mora S/${abono_mora}`);
                 }
             }
         }
