@@ -1031,10 +1031,10 @@ async function procesarPago() {
 
     mensajeDiv.innerText = '⏳ Procesando pago...';
 
-    // MERCADOPAGO: Redirigir a página de pago externa
-    if (medioPago === 'MERCADOPAGO') {
+    // FLOW: Redirigir a página de pago externa
+    if (medioPago === 'FLOW') {
         try {
-            const mpRes = await fetch(`${API_URL}/mercadopago/crear-preferencia`, {
+            const flowRes = await fetch(`${API_URL}/flow/crear-pago`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1045,25 +1045,25 @@ async function procesarPago() {
                 })
             });
 
-            const mpData = await mpRes.json();
+            const flowData = await flowRes.json();
 
-            if (mpRes.ok && mpData.init_point) {
+            if (flowRes.ok && flowData.url) {
                 mensajeDiv.innerHTML = `
-                    <p>🔵 Redirigiendo a MercadoPago...</p>
+                    <p>🔵 Redirigiendo a Flow...</p>
                     <p style="font-size: 0.9em; color: #666;">Si no se abre automáticamente, 
-                    <a href="${mpData.init_point}" target="_blank" style="color: #3498db;">haz clic aquí</a></p>
+                    <a href="${flowData.url}" target="_blank" style="color: #3498db;">haz clic aquí</a></p>
                 `;
-                // Redirigir a MercadoPago
-                window.open(mpData.init_point, '_blank');
+                // Redirigir a Flow
+                window.open(flowData.url, '_blank');
                 return;
             } else {
-                mensajeDiv.innerText = `❌ Error con MercadoPago: ${mpData.error || 'Intente nuevamente'}`;
+                mensajeDiv.innerText = `❌ Error con Flow: ${flowData.error || 'Intente nuevamente'}`;
                 mensajeDiv.classList.add('error');
                 return;
             }
         } catch (err) {
-            console.error('Error MercadoPago:', err);
-            mensajeDiv.innerText = '❌ Error conectando con MercadoPago';
+            console.error('Error Flow:', err);
+            mensajeDiv.innerText = '❌ Error conectando con Flow';
             mensajeDiv.classList.add('error');
             return;
         }
