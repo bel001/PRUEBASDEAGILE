@@ -115,4 +115,40 @@ router.post('/', async (req, res) => {
   }
 });
 
+// GET /clientes/consulta-externa/:tipo/:documento
+// Consulta DNI/RUC sin registrar cliente (solo para auto-completar)
+router.get('/consulta-externa/:tipo/:documento', async (req, res) => {
+  const { tipo, documento } = req.params;
+  console.log(`📡 Consultando ${tipo} ${documento}...`);
+
+  try {
+    let datos = {};
+
+    if (tipo === 'DNI') {
+      const result = await consultarDni(documento);
+      console.log(`✅ DNI Encontrado: ${result.nombre}`);
+      datos = {
+        nombre: result.nombre || '',
+        direccion: result.direccion || '',
+        ubicacion: result.ubicacion || ''
+      };
+    } else if (tipo === 'RUC') {
+      const result = await consultarRuc(documento);
+      console.log(`✅ RUC Encontrado: ${result.razonSocial}`);
+      datos = {
+        nombre: result.razonSocial || '',
+        direccion: result.direccion || '',
+        estado: result.estado || ''
+      };
+    } else {
+      return res.status(400).json({ error: 'Tipo no soportado' });
+    }
+
+    res.json(datos);
+  } catch (err) {
+    console.error(`❌ Error ${tipo}:`, err.message);
+    res.status(500).json({ error: 'No se pudo consultar el documento' });
+  }
+});
+
 module.exports = router;
