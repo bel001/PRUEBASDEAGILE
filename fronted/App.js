@@ -10,13 +10,13 @@ const API_URL = (window.location.hostname === 'localhost' || window.location.pro
 document.addEventListener('DOMContentLoaded', function () {
     verificarSesion();
 
-    // Detectar callback de MercadoPago
+    // Detectar callback de Flow
     const urlParams = new URLSearchParams(window.location.search);
     const pagoStatus = urlParams.get('pago');
 
-    if (pagoStatus === 'exitoso') {
+    if (pagoStatus === 'flow') {
         setTimeout(() => {
-            mostrarToast('✅ Pago procesado exitosamente vía MercadoPago. El comprobante se generó automáticamente.', 'success');
+            mostrarToast('✅ Pago procesado exitosamente vía Flow. El comprobante se generó automáticamente.', 'success');
             // Limpiar URL
             window.history.replaceState({}, document.title, window.location.pathname);
         }, 1500);

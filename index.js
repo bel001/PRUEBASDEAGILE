@@ -9,6 +9,8 @@ const prestamosRoutes = require('./routes/prestamos');
 const pagosRoutes = require('./routes/pagos');
 const cajaRoutes = require('./routes/caja');
 const mercadopagoRoutes = require('./routes/mercadopago');
+const flowRoutes = require('./routes/flow');
+
 
 app.use(cors());
 app.use(express.json());
@@ -19,6 +21,8 @@ app.use('/prestamos', prestamosRoutes);
 app.use('/pagos', pagosRoutes);
 app.use('/caja', cajaRoutes);
 app.use('/mercadopago', mercadopagoRoutes);
+app.use('/flow', flowRoutes);
+
 
 // Health check para Render
 app.get('/health', (req, res) => {
