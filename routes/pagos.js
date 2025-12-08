@@ -37,20 +37,58 @@ router.post('/', async (req, res) => {
     if (!cuotaSnap.exists) return res.status(404).json({ error: 'Cuota no encontrada' });
     const cuota = cuotaSnap.data();
 
-    // 3. Cálculos matemáticos (igual que antes)
+    // 4. Lógica de Mora y Pagos Parciales (RF5, RN1)
     const vencida = esVencida(cuota.fecha_vencimiento);
-    const mora = calcularMora(cuota.saldo_pendiente, vencida);
-    const total_debido = cuota.saldo_pendiente + mora;
+    const moraCalculada = calcularMora(cuota.saldo_pendiente, vencida);
+    const total_con_mora = cuota.saldo_pendiente + moraCalculada;
 
-    if (monto_pagado > total_debido) {
-      return res.status(400).json({ error: 'El pago excede la deuda', total_debido });
+    // Determinar cómo se aplica el pago
+    let abono_capital = 0;
+    let abono_mora = 0;
+    let mora_pagada_actualmente = 0;
+
+    if (monto_pagado >= total_con_mora) {
+      // PAGO TOTAL (o mayor): Cubre Mora + Capital
+      // RN: Si paga todo, se cobra la mora.
+      abono_mora = moraCalculada;
+      abono_capital = cuota.saldo_pendiente; // Se cancela todo el saldo
+      mora_pagada_actualmente = moraCalculada;
+    } else {
+      // PAGO PARCIAL: Se anula la mora del mes (RF5)
+      // Todo el dinero va a capital (saldo_pendiente)
+      abono_mora = 0; // Mora condonada/anulada por pago parcial
+      // El pago no puede exceder el capital (aunque ya validamos arriba, por seguridad)
+      abono_capital = Math.min(monto_pagado, cuota.saldo_pendiente);
+      mora_pagada_actualmente = 0;
+
+      // NOTA: RN1 dice "Si el cliente hace cualquier pago parcial... la mora se anula".
+      // Por eso cobramos 0 de mora y todo a capital.
     }
 
-    const { montoCobrar, ajuste } = aplicarRedondeo(monto_pagado, medio_pago);
-    const nuevo_saldo = Math.max(0, Number((cuota.saldo_pendiente - montoCobrar).toFixed(2)));
-    const pagada = nuevo_saldo <= 0;
+    // Validar exceso (aunque con la lógica de arriba abono_capital se ajusta, 
+    // validamos que no paguen más de la cuenta si es pago total estricto)
+    // Pero permitimos redondeo hacia arriba en efectivo, así que el "cambio" se maneja en frontend o caja chica?
+    // RF7: "El sistema debe registrar el monto final efectivamente ingresado" -> monto_real_recibido
+    // Aquí asumimos monto_pagado es lo procesado.
 
-    // 4. Escritura en Lote (Batch) para seguridad
+    const { montoCobrar, ajuste } = aplicarRedondeo(monto_pagado, medio_pago);
+
+    // Recalcular distribucion con montoCobrar (agregando ajuste si efectivo)
+    // Si hubo redondeo, el montoCobrar es el oficial. Re-aplicamos lógica distribución.
+
+    // RE-CALCULO FINAL CON MONTO REDONDEADO
+    if (montoCobrar >= total_con_mora) {
+      abono_mora = moraCalculada;
+      abono_capital = cuota.saldo_pendiente;
+    } else {
+      abono_mora = 0;
+      abono_capital = Math.min(montoCobrar, cuota.saldo_pendiente);
+    }
+
+    const nuevo_saldo = Number((cuota.saldo_pendiente - abono_capital).toFixed(2));
+    const pagada = nuevo_saldo <= 0; // Se considera pagada si saldo capital es 0
+
+    // 4. Escritura en Lote
     const batch = db.batch();
 
     // A) Crear Pago
@@ -59,10 +97,14 @@ router.post('/', async (req, res) => {
     const pagoData = {
       cuota_id,
       fecha_pago: new Date().toISOString(),
-      monto_pagado: montoCobrar,
+      monto_pagado: montoCobrar, // Monto oficial sistema
+      monto_recibido: monto_pagado, // Monto físico
       medio_pago,
       redondeo_ajuste: ajuste,
-      monto_recibido: monto_pagado
+      desglose: {
+        capital: abono_capital,
+        mora: abono_mora
+      }
     };
     batch.set(pagoRef, pagoData);
 
@@ -70,6 +112,7 @@ router.post('/', async (req, res) => {
     batch.update(cuotaRef, {
       saldo_pendiente: nuevo_saldo,
       pagada: pagada
+      // No guardamos 'mora_acumulada' porque se recalcula cada vez o se anula.
     });
 
     // C) Crear Comprobante

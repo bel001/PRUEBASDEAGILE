@@ -114,7 +114,21 @@ router.post('/cierre', async (req, res) => {
     const saldo_teorico_cajon = ultima.monto_inicial + total_efectivo_sistema;
 
     // Diferencia (Sobrante o Faltante en efectivo)
-    const diferencia = Number(total_real_efectivo) - saldo_teorico_cajon;
+    const diferencia = Number((Number(total_real_efectivo) - saldo_teorico_cajon).toFixed(2));
+
+    // RN3: Si las operaciones no cuadran, no permite cerrar
+    // "No cuadran" implica diferencia != 0. 
+    // Considerando punto flotante, usamos un epsilon muy pequeño o comparamos estricto.
+    if (diferencia !== 0) {
+      return res.status(400).json({
+        error: 'La caja no cuadra. No se puede realizar el cierre.',
+        detalle: {
+          esperado: saldo_teorico_cajon,
+          real: Number(total_real_efectivo),
+          diferencia: diferencia
+        }
+      });
+    }
 
     // Actualizar caja a cerrada
     await cajaRef.doc(ultima.id).update({

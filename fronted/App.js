@@ -1004,10 +1004,26 @@ async function procesarPago() {
                 comprobante_id: data.pago_id
             };
 
-            // Preguntar si quiere descargar el comprobante
+
+            // Guardar datos para reimpresión temporal (opcional)
+            // ...
+
+            // Preguntar acciones de comprobante (RF3)
             setTimeout(() => {
-                if (confirm('✅ ¡Pago registrado exitosamente!\n\n¿Desea descargar el comprobante en PDF?')) {
+                const opcion = prompt(
+                    `✅ ¡Pago registrado correctamente!\n\n` +
+                    `Elija una opción de comprobante:\n` +
+                    `1️⃣ Descargar PDF\n` +
+                    `2️⃣ Enviar por WhatsApp\n` +
+                    `3️⃣ Ambos\n\n` +
+                    `Cualquier otra tecla para salir.`
+                );
+
+                if (opcion === '1' || opcion === '3') {
                     generarComprobantePDF(datoPago);
+                }
+                if (opcion === '2' || opcion === '3') {
+                    compartirWhatsApp(datoPago);
                 }
             }, 500);
 
