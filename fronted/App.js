@@ -429,9 +429,17 @@ function validarDocumento() {
     validacion.style.color = valido ? 'var(--secondary)' : 'var(--danger)';
 }
 
+// Timer para debounce (evitar múltiples llamadas)
+let busquedaDNITimeout = null;
+
 async function buscarDatosCliente() {
     const tipo = document.getElementById('tipo').value;
     const documento = document.getElementById('documento').value.trim();
+
+    // Cancelar búsqueda anterior si existe
+    if (busquedaDNITimeout) {
+        clearTimeout(busquedaDNITimeout);
+    }
 
     // Validar longitud antes de buscar
     if (tipo === 'DNI' && documento.length !== 8) return;

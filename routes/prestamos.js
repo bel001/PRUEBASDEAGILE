@@ -54,14 +54,14 @@ router.post('/', async (req, res) => {
     });
 
     const cronograma = [];
-    let fecha = new Date(fechaInicio);
 
-    // 4. Generar Cuotas
+    // 4. Generar Cuotas con EXACTAMENTE 30 días entre cada una
     for (let i = 1; i <= num_cuotas; i++) {
-      // Usar setMonth para sumar meses reales (28, 30, 31 días)
-      // Esto respeta el calendario real
-      fecha.setMonth(fecha.getMonth() + 1);
-      const fecha_vencimiento = fecha.toISOString().split('T')[0];
+      // Calcular fecha: fecha_inicio + (i * 30 días)
+      const diasDesdeInicio = i * 30;
+      const fecha_vencimiento_date = new Date(fechaInicio);
+      fecha_vencimiento_date.setDate(fecha_vencimiento_date.getDate() + diasDesdeInicio);
+      const fecha_vencimiento = fecha_vencimiento_date.toISOString().split('T')[0];
 
       const cuotaRef = db.collection('cuotas').doc(); // ID automático
       const dataCuota = {

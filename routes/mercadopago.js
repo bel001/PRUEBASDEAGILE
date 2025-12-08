@@ -146,6 +146,44 @@ router.post('/webhook', async (req, res) => {
 
                     await batch.commit();
 
+                    console.log(`✅ Pago MercadoPago registrado: Capital S/${abono_capital}, Mora S/${abono_mora}`);
+
+                    // GENERAR COMPROBANTE AUTOMÁTICAMENTE
+                    try {
+                        // Obtener datos del cliente y préstamo
+                        const prestamoSnap = await db.collection('prestamos').doc(cuota.prestamo_id).get();
+                        const clienteSnap = await db.collection('clientes').doc(cuota.cliente_id).get();
+
+                        if (prestamoSnap.exists && clienteSnap.exists) {
+                            const prestamo = prestamoSnap.data();
+                            const cliente = clienteSnap.data();
+
+                            // Guardar datos del comprobante en Firebase
+                            await db.collection('comprobantes').add({
+                                pago_id: pagoRef.id,
+                                cuota_id,
+                                cliente_nombre: cliente.nombre,
+                                cliente_documento: cliente.documento,
+                                cliente_email: cliente.email || paymentInfo.payer?.email,
+                                numero_cuota: cuota.numero_cuota,
+                                fecha_emision: new Date().toISOString(),
+                                monto_total: monto_pagado,
+                                desglose: {
+                                    capital: abono_capital,
+                                    mora: abono_mora
+                                },
+                                medio_pago: 'MERCADOPAGO',
+                                serie: cliente.documento?.length === 11 ? 'F001' : 'B001',
+                                tipo: cliente.documento?.length === 11 ? 'FACTURA' : 'BOLETA'
+                            });
+
+                            console.log(`📄 Comprobante generado automáticamente para pago ${pagoRef.id}`);
+                        }
+                    } catch (receiptError) {
+                        console.error('⚠️ Error generando comprobante:', receiptError.message);
+                        // No fallar el webhook por esto
+                    }
+
                     // Si todas las cuotas están pagadas, marcar préstamo como cancelado
                     if (pagada) {
                         const prestamo_id = cuota.prestamo_id;

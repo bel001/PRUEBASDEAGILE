@@ -22,15 +22,16 @@ async function consultarDni(numero) {
 
     // Mapeo seguro para DNI
     return {
-        nombre: data.nombre || `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno}`,
-        nombres: data.nombres,
-        apellidoPaterno: data.apellidoPaterno,
-        apellidoMaterno: data.apellidoMaterno,
-        direccion: data.direccion || ''
+      nombre: data.nombre || `${data.nombres} ${data.apellidoPaterno} ${data.apellidoMaterno}`,
+      nombres: data.nombres,
+      apellidoPaterno: data.apellidoPaterno,
+      apellidoMaterno: data.apellidoMaterno,
+      direccion: data.direccion || ''
     };
   } catch (error) {
     console.error("❌ Error DNI:", error.message);
-    return { nombre: `Usuario Simulado ${numero}` };
+    // NO retornar datos falsos - lanzar error para que el frontend sepa que falló
+    throw new Error(`No se pudo consultar DNI ${numero}: ${error.message}`);
   }
 }
 
@@ -51,15 +52,15 @@ async function consultarRuc(numero) {
 
     // Mapeo seguro para RUC (A veces viene como 'nombre' o 'razonSocial')
     return {
-        razonSocial: data.nombre || data.razonSocial || `Empresa RUC ${numero}`,
-        direccion: data.direccion || '',
-        estado: data.estado || '',
-        condicion: data.condicion || ''
+      razonSocial: data.nombre || data.razonSocial || `Empresa RUC ${numero}`,
+      direccion: data.direccion || '',
+      estado: data.estado || '',
+      condicion: data.condicion || ''
     };
   } catch (error) {
-     console.error("❌ Error RUC:", error.message);
-     // Modo simulación si falla
-     return { razonSocial: `Empresa Simulada RUC ${numero}` };
+    console.error("❌ Error RUC:", error.message);
+    // NO retornar datos falsos - lanzar error
+    throw new Error(`No se pudo consultar RUC ${numero}: ${error.message}`);
   }
 }
 

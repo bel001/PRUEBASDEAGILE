@@ -126,7 +126,7 @@ router.get('/consulta-externa/:tipo/:documento', async (req, res) => {
 
     if (tipo === 'DNI') {
       const result = await consultarDni(documento);
-      console.log(`✅ DNI Encontrado: ${result.nombre}`);
+      console.log(`✅ DNI Result:`, result);
       datos = {
         nombre: result.nombre || '',
         direccion: result.direccion || '',
@@ -134,7 +134,7 @@ router.get('/consulta-externa/:tipo/:documento', async (req, res) => {
       };
     } else if (tipo === 'RUC') {
       const result = await consultarRuc(documento);
-      console.log(`✅ RUC Encontrado: ${result.razonSocial}`);
+      console.log(`✅ RUC Result:`, result);
       datos = {
         nombre: result.razonSocial || '',
         direccion: result.direccion || '',
@@ -144,10 +144,12 @@ router.get('/consulta-externa/:tipo/:documento', async (req, res) => {
       return res.status(400).json({ error: 'Tipo no soportado' });
     }
 
+    // SIEMPRE devolver 200 OK
     res.json(datos);
   } catch (err) {
+    // Devolver datos vacíos en lugar de error 500
     console.error(`❌ Error ${tipo}:`, err.message);
-    res.status(500).json({ error: 'No se pudo consultar el documento' });
+    res.json({ nombre: '', direccion: '' });
   }
 });
 

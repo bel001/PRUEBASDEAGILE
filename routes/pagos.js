@@ -37,6 +37,26 @@ router.post('/', async (req, res) => {
     if (!cuotaSnap.exists) return res.status(404).json({ error: 'Cuota no encontrada' });
     const cuota = cuotaSnap.data();
 
+    // 3. VALIDACIÓN: Las cuotas deben pagarse EN ORDEN
+    if (cuota.numero_cuota > 1) {
+      // Verificar que la cuota anterior esté pagada
+      const cuotasAnteriores = await db.collection('cuotas')
+        .where('prestamo_id', '==', cuota.prestamo_id)
+        .where('numero_cuota', '<', cuota.numero_cuota)
+        .get();
+
+      const hayImpagadas = cuotasAnteriores.docs.some(doc => {
+        const c = doc.data();
+        return c.pagada === false;
+      });
+
+      if (hayImpagadas) {
+        return res.status(400).json({
+          error: 'Debe pagar las cuotas en orden. Complete primero las cuotas anteriores.'
+        });
+      }
+    }
+
     // 4. Lógica de Mora y Pagos Parciales (RF5, RN1)
     const vencida = esVencida(cuota.fecha_vencimiento);
     const moraCalculada = calcularMora(cuota.saldo_pendiente, vencida);
