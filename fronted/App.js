@@ -429,6 +429,76 @@ function validarDocumento() {
     validacion.style.color = valido ? 'var(--secondary)' : 'var(--danger)';
 }
 
+async function buscarDatosCliente() {
+    const tipo = document.getElementById('tipo').value;
+    const documento = document.getElementById('documento').value.trim();
+
+    // Validar longitud antes de buscar
+    if (tipo === 'DNI' && documento.length !== 8) return;
+    if (tipo === 'RUC' && documento.length !== 11) return;
+    if (!documento) return;
+
+    // Primero verificar si el cliente ya existe localmente
+    try {
+        const resClientes = await fetch(`${API_URL}/clientes`);
+        const clientes = await resClientes.json();
+        const existe = clientes.find(c => c.documento === documento);
+
+        if (existe) {
+            // Si existe, llenar con datos guardados
+            document.getElementById('nombre').value = existe.nombre;
+            document.getElementById('direccion').value = existe.direccion || '';
+            document.getElementById('telefono').value = existe.telefono || '';
+            document.getElementById('email').value = existe.email || '';
+            document.getElementById('doc-validacion').innerText = '⚠️ Ya existe';
+            document.getElementById('doc-validacion').style.color = 'var(--warning)';
+            document.getElementById('doc-mensaje').innerText = `Cliente ya registrado: ${existe.nombre}`;
+            mostrarToast(`Cliente ya existe: ${existe.nombre}`, 'warning');
+            return;
+        }
+    } catch (err) {
+        console.error('Error verificando cliente:', err);
+    }
+
+    // Si no existe localmente, consultar API externa
+    document.getElementById('doc-validacion').innerText = '⏳';
+    document.getElementById('doc-validacion').style.color = 'var(--info)';
+    document.getElementById('doc-mensaje').innerText = 'Consultando datos...';
+
+    try {
+        const res = await fetch(`${API_URL}/clientes/consulta-externa/${tipo}/${documento}`);
+
+        if (res.ok) {
+            const datos = await res.json();
+
+            // Llenar automáticamente el formulario
+            if (datos.nombre) {
+                document.getElementById('nombre').value = datos.nombre;
+            }
+            if (datos.direccion) {
+                document.getElementById('direccion').value = datos.direccion;
+            }
+
+            document.getElementById('doc-validacion').innerText = '✅';
+            document.getElementById('doc-validacion').style.color = 'var(--secondary)';
+            document.getElementById('doc-mensaje').innerText = '✅ Datos encontrados. Complete el resto del formulario.';
+            mostrarToast('Datos encontrados en RENIEC/SUNAT', 'success');
+        } else {
+            // No se encontró en API externa
+            document.getElementById('doc-validacion').innerText = '❌';
+            document.getElementById('doc-validacion').style.color = 'var(--danger)';
+            document.getElementById('doc-mensaje').innerText = 'No se encontraron datos. Complete manualmente.';
+            mostrarToast('No se encontraron datos. Complete manualmente', 'warning');
+        }
+    } catch (error) {
+        console.error('Error consultando datos:', error);
+        document.getElementById('doc-validacion').innerText = '❌';
+        document.getElementById('doc-validacion').style.color = 'var(--danger)';
+        document.getElementById('doc-mensaje').innerText = 'Error de conexión. Complete manualmente.';
+        mostrarToast('Error de conexión con servicio externo', 'error');
+    }
+}
+
 async function verificarDuplicado() {
     const documento = document.getElementById('documento').value.trim();
     if (documento.length < 6) return;

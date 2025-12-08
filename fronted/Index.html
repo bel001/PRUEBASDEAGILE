@@ -201,7 +201,11 @@
                                 <label>Número de Documento: <span class="required">*</span></label>
                                 <div class="input-group">
                                     <input type="text" id="documento" placeholder="Ingrese el número" maxlength="8"
-                                        oninput="validarDocumento()" onblur="verificarDuplicado()">
+                                        oninput="validarDocumento()" onblur="buscarDatosCliente()">
+                                    <button type="button" class="btn-small" onclick="buscarDatosCliente()"
+                                        style="margin-left: 5px; padding: 8px 15px;">
+                                        🔍 Buscar Datos
+                                    </button>
                                     <span id="doc-validacion" class="validation-icon"></span>
                                 </div>
                                 <small id="doc-mensaje">DNI debe tener exactamente 8 dígitos.</small>
