@@ -21,7 +21,9 @@ router.post('/crear-pago', async (req, res) => {
             commerceOrder: cuota_id,
             subject: `Pago de cuota - ${cliente_nombre || 'Cliente'}`,
             amount: monto, // En soles (PEN)
-            email: cliente_email || 'cliente@ejemplo.com',
+            email: cliente_email && cliente_email.includes('@') && !cliente_email.includes('example')
+                ? cliente_email
+                : 'pagos@agileprestamos.com',
             urlConfirmation: `${BASE_URL}/flow/webhook`,
             urlReturn: `${BASE_URL}?pago=flow&cuota_id=${cuota_id}`
         });
