@@ -1061,6 +1061,15 @@ async function procesarPago() {
                 // Redirigir a Flow
                 window.open(flowData.url, '_blank');
                 return;
+            } else if (flowData.requiereVerificacion) {
+                mensajeDiv.innerHTML = `
+                    <p style="color: #e67e22;">⚠️ ${flowData.error}</p>
+                    <button class="btn-primary" style="margin-top:10px; background:#f39c12;" 
+                        onclick="sincronizarCuota('${flowData.cuota_id}')">
+                        🔄 Sincronizar ahora
+                    </button>
+                `;
+                return;
             } else {
                 mensajeDiv.innerText = `❌ Error con Flow: ${flowData.error || 'Intente nuevamente'}`;
                 mensajeDiv.classList.add('error');
@@ -1151,6 +1160,47 @@ async function procesarPago() {
 }
 
 // ==================== GENERACIÓN DE COMPROBANTE PDF ====================
+async function sincronizarCuota(cuotaId) {
+    if (!confirm('¿Deseas verificar si hay pagos pendientes en Flow para esta cuota?')) return;
+
+    const mensajeDiv = document.getElementById('mensaje-pago');
+    mensajeDiv.innerText = '⏳ Sincronizando con Flow...';
+    mensajeDiv.className = 'mensaje';
+
+    try {
+        const res = await fetch(`${API_URL}/flow/sincronizar-cuota`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cuota_id: cuotaId })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            mensajeDiv.innerHTML = `
+                <p style="color: #27ae60;">✅ ${data.mensaje}</p>
+                <p>Nuevo saldo: S/ ${Number(data.nuevo_saldo).toFixed(2)}</p>
+            `;
+            mensajeDiv.className = 'mensaje exito';
+
+            if (data.pagada || data.total_pagado > 0) {
+                setTimeout(() => {
+                    cargarDetallePrestamo(prestamoActivo.prestamo.id);
+                    // Ocultar mensaje o limpiar campos
+                }, 2000);
+            }
+
+        } else {
+            mensajeDiv.innerText = `❌ ${data.mensaje}`;
+            mensajeDiv.className = 'mensaje error';
+        }
+    } catch (err) {
+        console.error('Error sincronizando:', err);
+        mensajeDiv.innerText = '❌ Error de conexión';
+        mensajeDiv.classList.add('error');
+    }
+}
+
 function generarComprobantePDF(datoPago) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
