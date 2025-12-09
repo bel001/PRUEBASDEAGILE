@@ -56,8 +56,13 @@ async function createPayment(data) {
     console.log('🔵 Flow createPayment params:', params);
 
     try {
-        const response = await axios.post(`${FLOW_BASE_URL}/payment/create`, null, {
-            params,
+        // Convertir objeto a URL-encoded string para el body
+        const formData = new URLSearchParams();
+        Object.keys(params).forEach(key => {
+            formData.append(key, params[key]);
+        });
+
+        const response = await axios.post(`${FLOW_BASE_URL}/payment/create`, formData.toString(), {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
