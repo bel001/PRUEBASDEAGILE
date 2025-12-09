@@ -41,7 +41,8 @@ async function createPayment(data) {
         amount: Math.round(data.amount), // Flow requiere entero (sin decimales)
         email: data.email, // Email del cliente
         urlConfirmation: data.urlConfirmation, // Webhook
-        urlReturn: data.urlReturn // URL de retorno
+        urlReturn: data.urlReturn, // URL de retorno
+        paymentMethod: 9 // 9 = Todos los métodos disponibles
     };
 
     // Generar firma
