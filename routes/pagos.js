@@ -39,20 +39,28 @@ router.post('/', async (req, res) => {
 
     // 3. VALIDACIÓN: Las cuotas deben pagarse EN ORDEN
     if (cuota.numero_cuota > 1) {
-      // Verificar que la cuota anterior esté pagada
-      const cuotasAnteriores = await db.collection('cuotas')
-        .where('prestamo_id', '==', cuota.prestamo_id)
-        .where('numero_cuota', '<', cuota.numero_cuota)
-        .get();
+      try {
+        // Verificar que la cuota anterior esté pagada
+        const cuotasAnteriores = await db.collection('cuotas')
+          .where('prestamo_id', '==', cuota.prestamo_id)
+          .where('numero_cuota', '<', cuota.numero_cuota)
+          .get();
 
-      const hayImpagadas = cuotasAnteriores.docs.some(doc => {
-        const c = doc.data();
-        return c.pagada === false;
-      });
+        const hayImpagadas = cuotasAnteriores.docs.some(doc => {
+          const c = doc.data();
+          return c.pagada === false;
+        });
 
-      if (hayImpagadas) {
+        if (hayImpagadas) {
+          return res.status(400).json({
+            error: `⚠️ Debe pagar las cuotas en orden. Complete primero la cuota anterior (cuota ${cuota.numero_cuota - 1}).`
+          });
+        }
+      } catch (indexError) {
+        // Si falla la consulta por falta de índice, mostrar mensaje amigable
+        console.error('Error validación orden de cuotas:', indexError.message);
         return res.status(400).json({
-          error: 'Debe pagar las cuotas en orden. Complete primero las cuotas anteriores.'
+          error: `⚠️ Debe pagar las cuotas en orden. Esta es la cuota #${cuota.numero_cuota}. Verifique que las cuotas anteriores estén pagadas.`
         });
       }
     }
