@@ -37,8 +37,8 @@ async function createPayment(data) {
         apiKey: API_KEY,
         commerceOrder: data.commerceOrder, // ID único de la orden (cuota_id)
         subject: data.subject, // Descripción del pago
-        currency: 'PEN', // Soles peruanos
-        amount: Math.round(data.amount), // Flow requiere entero (sin decimales)
+        currency: 'CLP', // Peso chileno (testeando - PEN puede no estar habilitado)
+        amount: Math.round(data.amount * 25), // Convertir PEN a CLP aprox (1 PEN ≈ 25 CLP)
         email: data.email, // Email del cliente
         urlConfirmation: data.urlConfirmation, // Webhook
         urlReturn: data.urlReturn, // URL de retorno
