@@ -113,7 +113,17 @@ router.post('/', async (req, res) => {
       abono_capital = Math.min(montoCobrar, cuota.saldo_pendiente);
     }
 
-    const nuevo_saldo = Number((cuota.saldo_pendiente - abono_capital).toFixed(2));
+    // TOLERANCIA DE REDONDEO: Si la diferencia es menor a S/1.00, considerar como pago completo
+    // Esto permite que redondeos hacia abajo (ej: 8.33 -> 8.30) marquen la cuota como pagada
+    let nuevo_saldo = Number((cuota.saldo_pendiente - abono_capital).toFixed(2));
+
+    if (nuevo_saldo > 0 && nuevo_saldo <= 1.00 && medio_pago === 'EFECTIVO') {
+      // Ajustar para considerar la diferencia de redondeo como pagada
+      console.log(`📌 Tolerancia de redondeo aplicada: S/${nuevo_saldo} absorbido`);
+      abono_capital = cuota.saldo_pendiente; // Pagar el saldo completo
+      nuevo_saldo = 0;
+    }
+
     const pagada = nuevo_saldo <= 0; // Se considera pagada si saldo capital es 0
 
     // 4. Escritura en Lote
