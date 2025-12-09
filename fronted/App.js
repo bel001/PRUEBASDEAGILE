@@ -1699,21 +1699,39 @@ async function verHistorial(cuotaId, numeroCuota, clienteNombre, clienteDoc) {
         pagos.forEach(pago => {
             const fecha = new Date(pago.fecha_pago).toLocaleString('es-PE');
             const esAnulado = pago.estado === 'ANULADO';
+            const esFlow = pago.medio_pago === 'FLOW';
+
+            // Desglose de capital y mora si existe
+            const desglose = pago.desglose || {};
+            const capitalPagado = desglose.capital || pago.monto_pagado;
+            const moraPagada = desglose.mora || 0;
 
             const item = document.createElement('div');
             item.style.borderBottom = '1px solid #eee';
-            item.style.padding = '10px 0';
+            item.style.padding = '12px 0';
+            item.style.backgroundColor = esAnulado ? '#fef2f2' : (esFlow ? '#f0f9ff' : 'transparent');
             item.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: start;">
-                    <div>
-                        <div style="font-weight: bold; color: ${esAnulado ? '#e74c3c' : '#2c3e50'};">
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold; color: ${esAnulado ? '#e74c3c' : '#2c3e50'}; margin-bottom: 5px;">
                             ${esAnulado ? '🔴 ANULADO' : '✅ PAGO REALIZADO'}
+                            ${esFlow ? '<span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; margin-left: 8px;">💳 Flow</span>' : ''}
                         </div>
                         <div style="font-size: 0.9em; color: #555;">
-                            Fecha: ${fecha}<br>
-                            Monto: <strong>S/ ${pago.monto_pagado}</strong> (${pago.medio_pago})<br>
-                            ID: <span style="font-family: monospace; font-size: 0.8em;">${pago.id.substring(0, 8)}...</span>
+                            📅 ${fecha}<br>
+                            💰 Monto: <strong style="color: #27ae60;">S/ ${Number(pago.monto_pagado).toFixed(2)}</strong> 
+                            <span style="color: #888;">(${pago.medio_pago})</span>
                         </div>
+                        ${moraPagada > 0 ? `
+                        <div style="font-size: 0.85em; color: #777; margin-top: 4px;">
+                            📊 Desglose: Capital S/ ${Number(capitalPagado).toFixed(2)} | Mora S/ ${Number(moraPagada).toFixed(2)}
+                        </div>
+                        ` : ''}
+                        ${esFlow && pago.flow_order ? `
+                        <div style="font-size: 0.75em; color: #3498db; margin-top: 4px;">
+                            🔗 Orden Flow: ${pago.flow_order}
+                        </div>
+                        ` : ''}
                     </div>
                     <div>
                         ${!esAnulado && esAdmin ? `
