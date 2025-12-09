@@ -71,14 +71,14 @@ router.post('/webhook', async (req, res) => {
             const cuota_id = paymentStatus.commerceOrder;
             const monto_pagado = Number(paymentStatus.amount);
 
-            console.log(`✅ Pago aprobado para cuota ${cuota_id}, monto S/${monto_pagado}`);
+            console.log(`✅ Pago aprobado por Flow para cuota ${cuota_id}, monto S/${monto_pagado}`);
 
-            // Obtener cuota
+            // Obtener cuota para validaciones
             const cuotaRef = db.collection('cuotas').doc(cuota_id);
             const cuotaSnap = await cuotaRef.get();
 
             if (!cuotaSnap.exists) {
-                console.error(`⚠️ Cuota ${cuota_id} no encontrada`);
+                console.error(`⚠️ Cuota ${cuota_id} no encontrada (Reportada por Flow)`);
                 return res.status(200).send('OK');
             }
 
@@ -86,36 +86,52 @@ router.post('/webhook', async (req, res) => {
 
             // Importar lógica de mora
             const { calcularMora, esVencida } = require('../services/moraService');
-
             const vencida = esVencida(cuota.fecha_vencimiento);
             const moraCalculada = calcularMora(cuota.saldo_pendiente, vencida);
-            const total_con_mora = cuota.saldo_pendiente + moraCalculada;
+            const saldo_actual = Number(cuota.saldo_pendiente);
+
+            // Total deuda teórica al momento
+            const total_con_mora = saldo_actual + moraCalculada;
 
             let abono_capital = 0;
             let abono_mora = 0;
 
-            if (monto_pagado >= total_con_mora) {
-                // PAGO TOTAL
+            console.log(`📊 Estado actual cuota: Saldo S/${saldo_actual} | Mora Calc S/${moraCalculada} | Pagado Flow S/${monto_pagado}`);
+
+            // Lógica de distribución de pago (RN1: Pago Parcial anula mora del mes)
+            if (monto_pagado >= total_con_mora - 0.5) {
+                // PAGO TOTAL (Con tolerancia de 0.50 céntimos por redondeos)
                 abono_mora = moraCalculada;
-                abono_capital = cuota.saldo_pendiente;
+                // El resto va al capital (máximo lo que se debía)
+                const remanente = monto_pagado - abono_mora;
+                abono_capital = Math.min(remanente, saldo_actual);
             } else {
-                // PAGO PARCIAL - Mora se anula
+                // PAGO PARCIAL
+                // Todo a capital, mora se condona/anula por ahora
                 abono_mora = 0;
-                abono_capital = Math.min(monto_pagado, cuota.saldo_pendiente);
+                abono_capital = Math.min(monto_pagado, saldo_actual);
             }
 
-            const nuevo_saldo = Number((cuota.saldo_pendiente - abono_capital).toFixed(2));
-            const pagada = nuevo_saldo <= 0;
+            // Calculamos nuevo saldo
+            // Usamos Math.max(0, ...) para evitar saldos negativos por error
+            let nuevo_saldo = Number((saldo_actual - abono_capital).toFixed(2));
+            if (nuevo_saldo < 0) nuevo_saldo = 0;
+
+            // Tolerancia para declarar pagada (dejarla en 0 si falta muy poco, ej < 0.10)
+            const pagada = nuevo_saldo <= 0.50;
+            if (pagada) nuevo_saldo = 0;
+
+            console.log(`🔄 Nuevo saldo calculado: S/${nuevo_saldo} (Pagada? ${pagada})`);
 
             const batch = db.batch();
 
-            // Crear registro de pago
+            // 1. Registrar el pago en colección 'pagos'
             const pagoRef = db.collection('pagos').doc();
             batch.set(pagoRef, {
-                cuota_id,
+                cuota_id: cuota_id,
                 fecha_pago: new Date().toISOString(),
-                monto_pagado,
-                monto_recibido: monto_pagado,
+                monto_pagado: monto_pagado,
+                monto_recibido: monto_pagado, // En online es exacto
                 medio_pago: 'FLOW',
                 flow_token: token,
                 flow_order: paymentStatus.flowOrder,
@@ -127,62 +143,79 @@ router.post('/webhook', async (req, res) => {
                 payer_email: paymentStatus.payer || ''
             });
 
-            // Actualizar cuota
+            // 2. Actualizar la cuota
             batch.update(cuotaRef, {
                 saldo_pendiente: nuevo_saldo,
-                pagada: pagada
+                pagada: pagada,
+                // Si quisieras guardar historial en la cuota también:
+                // historial_pagos: admin.firestore.FieldValue.arrayUnion({...})
             });
 
+            // 3. Ejecutar cambios en BD
             await batch.commit();
+            console.log(`💾 Cambios guardados en Firebase correctamente.`);
 
-            console.log(`✅ Pago Flow registrado: Capital S/${abono_capital}, Mora S/${abono_mora}`);
-
-            // GENERAR COMPROBANTE AUTOMÁTICAMENTE
+            // GENERAR COMPROBANTE (Solo si el pago se procesó bien)
             try {
                 const prestamoSnap = await db.collection('prestamos').doc(cuota.prestamo_id).get();
-                const clienteSnap = await db.collection('clientes').doc(cuota.cliente_id).get();
+                // Intentamos buscar cliente por ID si está en el préstamo, sino fallará y no importa
+                let clienteDoc = '00000000';
+                let clienteNombre = 'Cliente Flow';
 
-                if (prestamoSnap.exists && clienteSnap.exists) {
-                    const cliente = clienteSnap.data();
-
-                    await db.collection('comprobantes').add({
-                        pago_id: pagoRef.id,
-                        cuota_id,
-                        cliente_nombre: cliente.nombre,
-                        cliente_documento: cliente.documento,
-                        cliente_email: cliente.email || paymentStatus.payer,
-                        numero_cuota: cuota.numero_cuota,
-                        fecha_emision: new Date().toISOString(),
-                        monto_total: monto_pagado,
-                        desglose: { capital: abono_capital, mora: abono_mora },
-                        medio_pago: 'FLOW',
-                        serie: cliente.documento?.length === 11 ? 'F001' : 'B001',
-                        tipo: cliente.documento?.length === 11 ? 'FACTURA' : 'BOLETA'
-                    });
-
-                    console.log(`📄 Comprobante generado automáticamente para pago ${pagoRef.id}`);
+                if (prestamoSnap.exists) {
+                    const pid = prestamoSnap.data().cliente_id;
+                    const cSnap = await db.collection('clientes').doc(pid).get();
+                    if (cSnap.exists) {
+                        clienteDoc = cSnap.data().documento;
+                        clienteNombre = cSnap.data().nombre;
+                    }
                 }
-            } catch (receiptError) {
-                console.error('⚠️ Error generando comprobante:', receiptError.message);
+
+                await db.collection('comprobantes').add({
+                    pago_id: pagoRef.id,
+                    cuota_id,
+                    cliente_nombre: clienteNombre,
+                    cliente_documento: clienteDoc,
+                    cliente_email: paymentStatus.payer,
+                    numero_cuota: cuota.numero_cuota,
+                    fecha_emision: new Date().toISOString(),
+                    monto_total: monto_pagado,
+                    desglose: { capital: abono_capital, mora: abono_mora },
+                    medio_pago: 'FLOW',
+                    serie: clienteDoc.length === 11 ? 'F001' : 'B001',
+                    tipo: clienteDoc.length === 11 ? 'FACTURA' : 'BOLETA'
+                });
+                console.log('📄 Comprobante generado para pago Flow');
+            } catch (errReceipt) {
+                console.error('⚠️ Error generando comprobante (no crítico):', errReceipt.message);
             }
 
-            // Verificar si todas las cuotas están pagadas
+
+            // Verificar si todas las cuotas están pagadas (Solo si esta cuota se pagó completa)
             if (pagada) {
                 const todasCuotas = await db.collection('cuotas')
                     .where('prestamo_id', '==', cuota.prestamo_id)
                     .get();
 
-                const todasPagadas = todasCuotas.docs.every(doc => doc.data().pagada === true);
+                // Verificamos en memoria (incluida la actual que acabamos de marcar en el batch pero que 
+                // en 'todasCuotas' vendría vieja si no volvemos a leer, pero aquí leemos de nuevo o usamos lógica)
+                // Mejor lógica: si todas las OTRAS están pagadas y esta también -> FIN.
 
-                if (todasPagadas) {
+                const otrasPendientes = todasCuotas.docs.filter(doc => {
+                    return doc.id !== cuota_id && doc.data().pagada === false;
+                });
+
+                if (otrasPendientes.length === 0) {
                     await db.collection('prestamos').doc(cuota.prestamo_id).update({
-                        cancelado: true
+                        cancelado: true,
+                        fecha_cancelacion: new Date().toISOString()
                     });
-                    console.log(`🎉 Préstamo ${cuota.prestamo_id} totalmente cancelado`);
+                    console.log(`🎉 PRÉSTAMO ${cuota.prestamo_id} COMPLETADO Y CANCELADO`);
                 }
             }
+
         } else {
-            console.log(`⚠️ Pago rechazado o pendiente. Status: ${paymentStatus.status}`);
+            console.log(`⚠️ Webhook recibido pero pago no aprobado (Status: ${paymentStatus.status})`);
         }
 
         // Siempre responder 200 OK para que Flow no reintente
@@ -202,6 +235,82 @@ router.get('/estado/:token', async (req, res) => {
         res.json(status);
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// TEST ROUTE - SIMULAR PAGO FLOW (SOLO DESARROLLO)
+router.get('/test-simulate/:cuota_id/:monto', async (req, res) => {
+    try {
+        const { cuota_id, monto } = req.params;
+
+        // Simular lógica de webhook sin validación de token
+        // Esto es SOLO para probar que la lógica de negocio (BD) funciona
+        // En producción DEBE usarse el webhook real
+
+        const db = require('../db/firebase');
+        const { calcularMora, esVencida } = require('../services/moraService');
+
+        const cuotaRef = db.collection('cuotas').doc(cuota_id);
+        const cuotaSnap = await cuotaRef.get();
+
+        if (!cuotaSnap.exists) return res.status(404).send('Cuota no encontrada');
+
+        const cuota = cuotaSnap.data();
+        const monto_pagado = Number(monto);
+
+        const vencida = esVencida(cuota.fecha_vencimiento);
+        const moraCalculada = calcularMora(cuota.saldo_pendiente, vencida);
+        const saldo_actual = Number(cuota.saldo_pendiente);
+        const total_con_mora = saldo_actual + moraCalculada;
+
+        let abono_capital = 0;
+        let abono_mora = 0;
+
+        if (monto_pagado >= total_con_mora - 0.5) {
+            abono_mora = moraCalculada;
+            const remanente = monto_pagado - abono_mora;
+            abono_capital = Math.min(remanente, saldo_actual);
+        } else {
+            abono_mora = 0;
+            abono_capital = Math.min(monto_pagado, saldo_actual);
+        }
+
+        let nuevo_saldo = Number((saldo_actual - abono_capital).toFixed(2));
+        if (nuevo_saldo < 0) nuevo_saldo = 0;
+
+        const pagada = nuevo_saldo <= 0.50;
+        if (pagada) nuevo_saldo = 0;
+
+        const batch = db.batch();
+        const pagoRef = db.collection('pagos').doc();
+
+        batch.set(pagoRef, {
+            cuota_id,
+            fecha_pago: new Date().toISOString(),
+            monto_pagado,
+            medio_pago: 'FLOW_TEST',
+            estado: 'APROBADO',
+            desglose: { capital: abono_capital, mora: abono_mora }
+        });
+
+        batch.update(cuotaRef, {
+            saldo_pendiente: nuevo_saldo,
+            pagada: pagada
+        });
+
+        await batch.commit();
+
+        res.json({
+            mensaje: 'Simulación exitosa',
+            anterior_saldo: saldo_actual,
+            abono_capital,
+            abono_mora,
+            nuevo_saldo,
+            pagada
+        });
+
+    } catch (err) {
+        res.status(500).send(err.message);
     }
 });
 

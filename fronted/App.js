@@ -819,11 +819,16 @@ async function mostrarDetallePrestamo(clienteId, prestamoData) {
                     diasAtraso = Math.floor((hoyDate - fechaVenc) / (1000 * 60 * 60 * 24));
                 }
 
+                const esParcial = !cuota.pagada && cuota.saldo_pendiente < cuota.monto_cuota;
+                const porcentajePagado = esParcial ? Math.round(((cuota.monto_cuota - cuota.saldo_pendiente) / cuota.monto_cuota) * 100) : 0;
+
                 const estado = cuota.pagada ?
                     '<span class="badge-pagada">✅ Pagada</span>' :
                     vencida ?
                         `<span class="badge-vencida">🔴 VENCIDA (${diasAtraso}d)</span>` :
-                        '<span class="badge-pendiente">⏳ Pendiente</span>';
+                        esParcial ?
+                            `<span class="badge-pendiente" style="background:#e67e22; color:white;">📉 Pendiente (Falta S/ ${cuota.saldo_pendiente.toFixed(2)})</span>` :
+                            '<span class="badge-pendiente">⏳ Pendiente</span>';
 
                 const row = document.createElement('tr');
                 if (vencida) {
@@ -1912,6 +1917,8 @@ function verEstadoCuenta() {
         let estado = '';
         let detalle = '';
 
+        const esParcial = !cuota.pagada && cuota.saldo_pendiente < cuota.monto_cuota;
+
         if (cuota.pagada) {
             estado = '<span style="color: #27ae60; font-weight: bold;">✅ PAGADA</span>';
             detalle = 'A tiempo';
@@ -1920,6 +1927,9 @@ function verEstadoCuenta() {
             const diasAtraso = Math.floor((new Date(hoy) - fechaVenc) / (1000 * 60 * 60 * 24));
             estado = `<span style="color: #e74c3c; font-weight: bold;">🔴 VENCIDA</span>`;
             detalle = `${diasAtraso} días de atraso`;
+        } else if (esParcial) {
+            estado = '<span style="color: #e67e22; font-weight: bold;">📉 PARCIAL</span>';
+            detalle = `Falta S/ ${cuota.saldo_pendiente.toFixed(2)}`;
         } else {
             estado = '<span style="color: #f39c12;">⏳ Pendiente</span>';
             detalle = 'Por vencer';
