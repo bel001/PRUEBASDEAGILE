@@ -809,49 +809,6 @@
         </div>
     </div>
 
-    <!-- SECCIÓN EMPLEADOS -->
-    <div id="seccion-empleados" class="seccion" style="display:none;">
-        <div class="card">
-            <div class="card-header">
-                <h3>👥 Gestión de Empleados</h3>
-                <button class="btn-small" onclick="cargarEmpleados()">🔄 Actualizar</button>
-            </div>
-            <div class="card-body">
-
-                <!-- Formulario Nuevo Empleado -->
-                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <h4>Nuevo Empleado</h4>
-                    <div class="input-group" style="margin-bottom: 10px;">
-                        <input type="text" id="emp-nombre" placeholder="Nombre completo">
-                        <input type="text" id="emp-usuario" placeholder="Usuario (Login)">
-                    </div>
-                    <div class="input-group">
-                        <input type="password" id="emp-password" placeholder="Contraseña">
-                        <select id="emp-rol">
-                            <option value="CAJERO">Cajero</option>
-                            <option value="ADMIN">Administrador</option>
-                        </select>
-                        <button class="btn-secondary" onclick="crearEmpleado()">➕ Crear</button>
-                    </div>
-                    <div id="mensaje-empleado" class="mensaje"></div>
-                </div>
-
-                <!-- Lista de Empleados -->
-                <table class="tabla-clientes">
-                    <thead>
-                        <tr>
-                            <th>Nombre</th>
-                            <th>Usuario</th>
-                            <th>Rol</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listaEmpleados"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 
     <!-- SECCIÓN CONFIGURACIÓN (SOLO ADMIN) -->
     <div id="seccion-config" class="seccion" style="display:none;">
