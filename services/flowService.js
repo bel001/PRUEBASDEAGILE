@@ -27,6 +27,27 @@ function generateSignature(params) {
         .digest('hex');
 
     return signature;
+}
+
+/**
+ * Crear orden de pago en Flow
+ */
+async function createPayment(data) {
+    // Flow requiere mínimo S/. 2.00 PEN
+    const finalAmount = Math.max(Math.round(data.amount), 2);
+
+    const params = {
+        apiKey: API_KEY,
+        commerceOrder: data.commerceOrder,
+        subject: data.subject,
+        currency: 'PEN', // Soles peruanos
+        amount: finalAmount,
+        email: data.email,
+        urlConfirmation: data.urlConfirmation,
+        urlReturn: data.urlReturn,
+        paymentMethod: 9
+    };
+
     // Generar firma
     params.s = generateSignature(params);
 
@@ -46,7 +67,7 @@ function generateSignature(params) {
         });
 
         console.log('✅ Flow payment created:', response.data);
-        return response.data; // { flowOrder, url, token }
+        return response.data;
     } catch (error) {
         console.error('❌ Error Flow createPayment:', error.response?.data || error.message);
         throw new Error(error.response?.data?.message || 'Error creando pago en Flow');
@@ -65,19 +86,19 @@ async function getPaymentStatus(token) {
     params.s = generateSignature(params);
 
     try {
-        const response = await axios.get(`${FLOW_BASE_URL}/payment/getStatus`, {
-            params
+        const formData = new URLSearchParams();
+        Object.keys(params).forEach(key => {
+            formData.append(key, params[key]);
+        });
+
+        const response = await axios.post(`${FLOW_BASE_URL}/payment/getStatus`, formData.toString(), {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
         });
 
         console.log('✅ Flow payment status:', response.data);
         return response.data;
-        /* 
-        {
-          flowOrder, commerceOrder, requestDate, status, subject,
-          currency, amount, payer, paymentData, merchantId
-        }
-        status: 1 = Pendiente, 2 = Pagado, 3 = Rechazado, 4 = Anulado
-        */
     } catch (error) {
         console.error('❌ Error Flow getStatus:', error.response?.data || error.message);
         throw new Error('Error consultando estado del pago');
