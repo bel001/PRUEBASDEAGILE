@@ -46,6 +46,28 @@ router.post('/crear-pago', async (req, res) => {
 
     } catch (err) {
         console.error('❌ Error creando pago Flow:', err);
+
+        // Error 1605: El pago ya fue realizado en Flow
+        if (err.message && err.message.includes('previously paid')) {
+            // Verificar si la cuota ya está marcada como pagada en nuestra BD
+            const cuotaRef = db.collection('cuotas').doc(req.body.cuota_id);
+            const cuotaSnap = await cuotaRef.get();
+
+            if (cuotaSnap.exists && cuotaSnap.data().pagada) {
+                return res.status(400).json({
+                    error: 'Esta cuota ya fue pagada anteriormente',
+                    yaPageda: true
+                });
+            } else {
+                // El pago existe en Flow pero no en nuestra BD - informar al usuario
+                return res.status(400).json({
+                    error: 'Este pago ya fue procesado en Flow. Si no ves el pago reflejado, contacta al administrador.',
+                    requiereVerificacion: true,
+                    cuota_id: req.body.cuota_id
+                });
+            }
+        }
+
         res.status(500).json({ error: err.message });
     }
 });
@@ -407,6 +429,96 @@ router.get('/estado/:token', async (req, res) => {
         const status = await getPaymentStatus(token);
         res.json(status);
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /flow/sincronizar-cuota - Buscar y sincronizar pago de Flow para una cuota
+// Útil cuando Flow dice "already paid" pero no está reflejado en la BD local
+router.post('/sincronizar-cuota', async (req, res) => {
+    try {
+        const { cuota_id } = req.body;
+
+        if (!cuota_id) {
+            return res.status(400).json({ error: 'cuota_id requerido' });
+        }
+
+        console.log(`🔍 Buscando pago Flow para cuota ${cuota_id}...`);
+
+        // 1. Verificar estado actual de la cuota
+        const cuotaRef = db.collection('cuotas').doc(cuota_id);
+        const cuotaSnap = await cuotaRef.get();
+
+        if (!cuotaSnap.exists) {
+            return res.status(404).json({ error: 'Cuota no encontrada' });
+        }
+
+        const cuota = cuotaSnap.data();
+
+        // Si ya está pagada, informar
+        if (cuota.pagada) {
+            return res.json({
+                success: true,
+                mensaje: 'La cuota ya está marcada como pagada',
+                cuota: {
+                    id: cuota_id,
+                    saldo_pendiente: cuota.saldo_pendiente,
+                    pagada: cuota.pagada
+                }
+            });
+        }
+
+        // 2. Buscar si hay pago registrado para esta cuota
+        const pagosExistentes = await db.collection('pagos')
+            .where('cuota_id', '==', cuota_id)
+            .where('estado', '==', 'APROBADO')
+            .get();
+
+        if (!pagosExistentes.empty) {
+            // Hay pagos pero la cuota no está marcada como pagada
+            // Recalcular saldo
+            let totalPagado = 0;
+            pagosExistentes.docs.forEach(doc => {
+                totalPagado += Number(doc.data().monto_pagado);
+            });
+
+            const nuevoSaldo = Math.max(0, cuota.monto_cuota - totalPagado);
+            const estaPagada = nuevoSaldo <= 0.50;
+
+            await cuotaRef.update({
+                saldo_pendiente: estaPagada ? 0 : nuevoSaldo,
+                pagada: estaPagada
+            });
+
+            return res.json({
+                success: true,
+                mensaje: estaPagada
+                    ? 'Cuota actualizada y marcada como pagada'
+                    : 'Cuota actualizada con los pagos encontrados',
+                total_pagado: totalPagado,
+                nuevo_saldo: nuevoSaldo,
+                pagada: estaPagada
+            });
+        }
+
+        // 3. Buscar en pagos_pendientes por tokens no procesados
+        const pendientesSnap = await db.collection('pagos_pendientes')
+            .where('procesado', '==', false)
+            .get();
+
+        // No podemos buscar el pago en Flow sin un token
+        // Pero podemos marcar esta cuota para revisión manual
+
+        return res.json({
+            success: false,
+            mensaje: 'No se encontraron pagos para esta cuota. Si realizaste el pago en Flow, contacta al administrador con tu comprobante.',
+            cuota_id,
+            saldo_pendiente: cuota.saldo_pendiente,
+            tokens_pendientes: pendientesSnap.size
+        });
+
+    } catch (err) {
+        console.error('Error sincronizando:', err);
         res.status(500).json({ error: err.message });
     }
 });
