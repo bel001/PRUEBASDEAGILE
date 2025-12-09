@@ -12,6 +12,18 @@ router.post('/crear-pago', async (req, res) => {
             return res.status(400).json({ error: 'Faltan datos obligatorios' });
         }
 
+        // Validar email - Flow requiere un email válido real
+        const emailValido = cliente_email &&
+            cliente_email.includes('@') &&
+            !cliente_email.includes('example') &&
+            !cliente_email.includes('cliente@');
+
+        if (!emailValido) {
+            return res.status(400).json({
+                error: 'Se requiere un email válido del cliente para procesar el pago con Flow'
+            });
+        }
+
         const BASE_URL = process.env.FRONTEND_URL || 'https://agile-prestamos-nn7p.onrender.com';
 
         console.log(`🔵 Creando pago Flow para cuota ${cuota_id}, monto S/${monto}`);
@@ -21,9 +33,7 @@ router.post('/crear-pago', async (req, res) => {
             commerceOrder: cuota_id,
             subject: `Pago de cuota - ${cliente_nombre || 'Cliente'}`,
             amount: monto, // En soles (PEN)
-            email: cliente_email && cliente_email.includes('@') && !cliente_email.includes('example')
-                ? cliente_email
-                : 'pagos@agileprestamos.com',
+            email: cliente_email, // Email ya validado
             urlConfirmation: `${BASE_URL}/flow/webhook`,
             urlReturn: `${BASE_URL}?pago=flow&cuota_id=${cuota_id}`
         });
