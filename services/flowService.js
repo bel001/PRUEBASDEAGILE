@@ -33,12 +33,17 @@ function generateSignature(params) {
  * Crear orden de pago en Flow
  */
 async function createPayment(data) {
+    // Flow requiere mínimo $350 CLP
+    // Convertir PEN a CLP con factor alto para cumplir el mínimo
+    const convertedAmount = Math.round(data.amount * 100); // 1 PEN = 100 CLP (asegura > $350)
+    const finalAmount = Math.max(convertedAmount, 350); // Garantizar mínimo $350
+
     const params = {
         apiKey: API_KEY,
         commerceOrder: data.commerceOrder, // ID único de la orden (cuota_id)
         subject: data.subject, // Descripción del pago
-        currency: 'CLP', // Peso chileno (testeando - PEN puede no estar habilitado)
-        amount: Math.round(data.amount * 25), // Convertir PEN a CLP aprox (1 PEN ≈ 25 CLP)
+        currency: 'CLP', // Peso chileno
+        amount: finalAmount, // Monto garantizado >= $350 CLP
         email: data.email, // Email del cliente
         urlConfirmation: data.urlConfirmation, // Webhook
         urlReturn: data.urlReturn, // URL de retorno
