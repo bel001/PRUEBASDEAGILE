@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/firebase');
 const { createPayment, getPaymentStatus } = require('../services/flowService');
+const {
+    calcularEstadoCuota,
+    distribuirPagoCuota,
+    actualizarPrestamoSiPagado
+} = require('../services/pagosService');
 
 // POST /flow/crear-pago
 router.post('/crear-pago', async (req, res) => {
@@ -80,62 +85,44 @@ async function procesarPagoAprobado(paymentData, token) {
     const cuota_id = paymentData.commerceOrder;
     const monto_pagado = Number(paymentData.amount);
 
-    console.log(`✅ Procesando pago para cuota ${cuota_id}, monto S/${monto_pagado}`);
+    console.log(`?o. Procesando pago para cuota ${cuota_id}, monto S/${monto_pagado}`);
 
     // Obtener cuota
     const cuotaRef = db.collection('cuotas').doc(cuota_id);
     const cuotaSnap = await cuotaRef.get();
 
     if (!cuotaSnap.exists) {
-        console.error(`⚠️ Cuota ${cuota_id} no encontrada`);
+        console.error(`?s???? Cuota ${cuota_id} no encontrada`);
         return { success: false, error: 'Cuota no encontrada' };
     }
 
     const cuota = cuotaSnap.data();
 
-    // Verificar si ya se procesó este pago (evitar duplicados)
+    // Verificar si ya se proces?? este pago (evitar duplicados)
     const pagosExistentes = await db.collection('pagos')
         .where('flow_token', '==', token)
         .get();
 
     if (!pagosExistentes.empty) {
-        console.log(`⚠️ Pago con token ${token} ya fue procesado anteriormente`);
+        console.log(`?s???? Pago con token ${token} ya fue procesado anteriormente`);
         return { success: true, message: 'Pago ya procesado anteriormente', duplicado: true };
     }
 
-    // Importar lógica de mora
-    const { calcularMora, esVencida } = require('../services/moraService');
-    const vencida = esVencida(cuota.fecha_vencimiento);
-    const moraCalculada = calcularMora(cuota.saldo_pendiente, vencida);
-    const saldo_actual = Number(cuota.saldo_pendiente);
-    const total_con_mora = saldo_actual + moraCalculada;
+    // Estado y distribuci??n de pago centralizados
+    const { moraCalculada, saldoActual } = calcularEstadoCuota(cuota);
+    const {
+        abonoMora,
+        abonoCapital,
+        nuevoSaldo,
+        pagada
+    } = distribuirPagoCuota({
+        montoPagado: monto_pagado,
+        saldoActual,
+        moraCalculada
+    });
 
-    let abono_capital = 0;
-    let abono_mora = 0;
-
-    console.log(`📊 Cuota: Saldo S/${saldo_actual} | Mora S/${moraCalculada} | Pagado S/${monto_pagado}`);
-
-    // Lógica de distribución de pago
-    if (monto_pagado >= total_con_mora - 0.5) {
-        // PAGO TOTAL
-        abono_mora = moraCalculada;
-        const remanente = monto_pagado - abono_mora;
-        abono_capital = Math.min(remanente, saldo_actual);
-    } else {
-        // PAGO PARCIAL - mora se condona
-        abono_mora = 0;
-        abono_capital = Math.min(monto_pagado, saldo_actual);
-    }
-
-    // Calcular nuevo saldo
-    let nuevo_saldo = Number((saldo_actual - abono_capital).toFixed(2));
-    if (nuevo_saldo < 0) nuevo_saldo = 0;
-
-    // Tolerancia para declarar pagada
-    const pagada = nuevo_saldo <= 0.50;
-    if (pagada) nuevo_saldo = 0;
-
-    console.log(`🔄 Nuevo saldo: S/${nuevo_saldo} (Pagada? ${pagada})`);
+    console.log(`?Y"S Cuota: Saldo S/${saldoActual} | Mora S/${moraCalculada} | Pagado S/${monto_pagado}`);
+    console.log(`?Y"" Nuevo saldo: S/${nuevoSaldo} (Pagada? ${pagada})`);
 
     const batch = db.batch();
 
@@ -152,22 +139,22 @@ async function procesarPagoAprobado(paymentData, token) {
         flow_order: paymentData.flowOrder,
         estado: 'APROBADO',
         desglose: {
-            capital: abono_capital,
-            mora: abono_mora
+            capital: abonoCapital,
+            mora: abonoMora
         },
         payer_email: paymentData.payer || ''
     });
 
     // 2. Actualizar la cuota
     batch.update(cuotaRef, {
-        saldo_pendiente: nuevo_saldo,
+        saldo_pendiente: nuevoSaldo,
         pagada: pagada,
         ultima_fecha_pago: new Date().toISOString()
     });
 
     // 3. Ejecutar cambios en BD
     await batch.commit();
-    console.log(`💾 Pago guardado en Firebase correctamente.`);
+    console.log(`?Y'? Pago guardado en Firebase correctamente.`);
 
     // 4. Generar comprobante
     try {
@@ -193,33 +180,21 @@ async function procesarPagoAprobado(paymentData, token) {
             numero_cuota: cuota.numero_cuota,
             fecha_emision: new Date().toISOString(),
             monto_total: monto_pagado,
-            desglose: { capital: abono_capital, mora: abono_mora },
+            desglose: { capital: abonoCapital, mora: abonoMora },
             medio_pago: 'FLOW',
             serie: clienteDoc.length === 11 ? 'F001' : 'B001',
             tipo: clienteDoc.length === 11 ? 'FACTURA' : 'BOLETA'
         });
-        console.log('📄 Comprobante generado');
+        console.log('?Y"" Comprobante generado');
     } catch (errReceipt) {
-        console.error('⚠️ Error generando comprobante:', errReceipt.message);
+        console.error('?s???? Error generando comprobante:', errReceipt.message);
     }
 
-    // 5. Verificar si préstamo está completo
+    // 5. Verificar si pr??stamo est?? completo
     if (pagada) {
-        const todasCuotas = await db.collection('cuotas')
-            .where('prestamo_id', '==', cuota.prestamo_id)
-            .get();
-
-        const otrasPendientes = todasCuotas.docs.filter(doc => {
-            return doc.id !== cuota_id && doc.data().pagada === false;
-        });
-
-        if (otrasPendientes.length === 0) {
-            await db.collection('prestamos').doc(cuota.prestamo_id).update({
-                cancelado: true,
-                estado: 'PAGADO',
-                fecha_cancelacion: new Date().toISOString()
-            });
-            console.log(`🎉 PRÉSTAMO ${cuota.prestamo_id} COMPLETADO`);
+        const completado = await actualizarPrestamoSiPagado(db, cuota.prestamo_id, cuota_id);
+        if (completado) {
+            console.log(`?YZ% PR?%STAMO ${cuota.prestamo_id} COMPLETADO`);
         }
     }
 
@@ -228,10 +203,10 @@ async function procesarPagoAprobado(paymentData, token) {
         pago_id: pagoRef.id,
         cuota_id,
         monto_pagado,
-        nuevo_saldo,
+        nuevo_saldo: nuevoSaldo,
         pagada,
-        abono_capital,
-        abono_mora
+        abono_capital: abonoCapital,
+        abono_mora: abonoMora
     };
 }
 

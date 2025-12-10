@@ -13,21 +13,41 @@ document.addEventListener('DOMContentLoaded', function () {
     // Detectar callback de Flow
     const urlParams = new URLSearchParams(window.location.search);
     const pagoStatus = urlParams.get('pago');
+    const token = urlParams.get('token');
 
-    if (pagoStatus === 'flow') {
-        setTimeout(() => {
-            mostrarToast('✅ Pago procesado exitosamente vía Flow. El comprobante se generó automáticamente.', 'success');
-            // Limpiar URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }, 1500);
+    if (pagoStatus === 'flow' && token) {
+        // Verificar el estado REAL del pago en el backend
+        // (Por si el webhook falló, cosa común en localhost)
+        mostrarToast('🔄 Verificando pago con el banco...', 'info');
+
+        fetch(`${API_URL}/flow/verificar-pago`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success || data.pagada) {
+                    mostrarToast('✅ Pago confirmado y registrado correctamente.', 'success');
+                    // Actualizar dashboard si está activo
+                    if (document.getElementById('seccion-dashboard').style.display !== 'none') {
+                        cargarDashboard();
+                    }
+                } else {
+                    mostrarToast('⚠️ El pago no se pudo verificar completamente. Revise el estado.', 'warning');
+                    console.error("Resultado verificación:", data);
+                }
+                // Limpiar URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            })
+            .catch(err => {
+                console.error("Error verificando pago al retornar:", err);
+                mostrarToast('❌ Error de conexión al verificar pago.', 'error');
+            });
+
     } else if (pagoStatus === 'fallido') {
         setTimeout(() => {
             mostrarToast('❌ El pago no pudo ser procesado. Intente nuevamente.', 'error');
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }, 1500);
-    } else if (pagoStatus === 'pendiente') {
-        setTimeout(() => {
-            mostrarToast('⏳ Pago pendiente de confirmación.', 'warning');
             window.history.replaceState({}, document.title, window.location.pathname);
         }, 1500);
     }

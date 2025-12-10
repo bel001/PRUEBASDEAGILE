@@ -96,10 +96,10 @@ async function createPayment(data) {
 /**
  * Obtener estado del pago CON REINTENTOS
  * @param {string} token - Token del pago
- * @param {number} maxRetries - Máximo de reintentos (default: 5 para sandbox)
- * @param {number} delayMs - Delay entre reintentos en ms (default: 5000)
+ * @param {number} maxRetries - Máximo de reintentos (default: 2 para respuesta rápida)
+ * @param {number} delayMs - Delay entre reintentos en ms (default: 2000)
  */
-async function getPaymentStatus(token, maxRetries = 5, delayMs = 5000) {
+async function getPaymentStatus(token, maxRetries = 2, delayMs = 2000) {
     // MODO MOCK LOCAL: Si el token es de simulación
     if (token.startsWith('MOCK_')) {
         console.log('🧪 MODO MOCK: Simulando consulta de estado para', token);
