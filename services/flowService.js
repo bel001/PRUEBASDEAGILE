@@ -79,10 +79,10 @@ async function createPayment(data) {
 /**
  * Obtener estado del pago CON REINTENTOS
  * @param {string} token - Token del pago
- * @param {number} maxRetries - Máximo de reintentos (default: 3)
- * @param {number} delayMs - Delay entre reintentos en ms (default: 2000)
+ * @param {number} maxRetries - Máximo de reintentos (default: 5 para sandbox)
+ * @param {number} delayMs - Delay entre reintentos en ms (default: 5000)
  */
-async function getPaymentStatus(token, maxRetries = 3, delayMs = 2000) {
+async function getPaymentStatus(token, maxRetries = 5, delayMs = 5000) {
     const params = {
         apiKey: API_KEY,
         token: token
