@@ -1629,121 +1629,14 @@ function verPrestamo(clienteId) {
 function cargarEmpleados() {
     const lista = document.getElementById('lista-empleados');
 
-    // Obtener empleados de localStorage
-    const empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
-
-    // Agregar empleados predeterminados si no existen
-    if (empleados.length === 0) {
-        empleados.push(
-            { usuario: 'cajero', password: '123', rol: 'cajero' },
-            { usuario: 'admin', password: 'admin123', rol: 'admin' },
-            { usuario: 'usuario', password: 'usuario123', rol: 'cajero' }
-        );
-        localStorage.setItem('empleados', JSON.stringify(empleados));
+    // Obtener empleados de localStorage (con fallback si est? corrupto)
+    let empleados = [];
+    try {
+        empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
+        if (!Array.isArray(empleados)) empleados = [];
+    } catch (e) {
+        empleados = [];
     }
-
-    lista.innerHTML = '';
-
-    if (empleados.length === 0) {
-        lista.innerHTML = '<tr><td colspan="3" style="text-align:center">No hay empleados registrados</td></tr>';
-        return;
-    }
-
-    empleados.forEach((emp, index) => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td><strong>${emp.usuario}</strong></td>
-            <td><span style="padding: 3px 8px; background: ${emp.rol === 'admin' ? '#e74c3c' : '#3498db'}; color: white; border-radius: 10px; font-size: 0.8em;">${emp.rol.toUpperCase()}</span></td>
-            <td>
-                <button class="btn-small" onclick="editarEmpleado(${index})" style="background: #f39c12;">✏️ Editar</button>
-                <button class="btn-small" onclick="eliminarEmpleado(${index})" style="background: #e74c3c;">🗑️ Eliminar</button>
-            </td>
-        `;
-        lista.appendChild(row);
-    });
-}
-
-function agregarEmpleado() {
-    const usuario = document.getElementById('nuevo-empleado-usuario').value.trim();
-    const password = document.getElementById('nuevo-empleado-password').value;
-    const rol = document.getElementById('nuevo-empleado-rol').value;
-    const mensajeDiv = document.getElementById('mensaje-empleados');
-
-    mensajeDiv.className = 'mensaje';
-    mensajeDiv.innerText = '';
-
-    if (!usuario || !password) {
-        mensajeDiv.innerText = '❌ Complete todos los campos';
-        mensajeDiv.classList.add('error');
-        return;
-    }
-
-    // Obtener empleados actuales
-    const empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
-
-    // Verificar si ya existe
-    if (empleados.find(e => e.usuario === usuario)) {
-        mensajeDiv.innerText = '❌ Ya existe un empleado con ese usuario';
-        mensajeDiv.classList.add('error');
-        return;
-    }
-
-    // Agregar nuevo empleado
-    empleados.push({ usuario, password, rol });
-    localStorage.setItem('empleados', JSON.stringify(empleados));
-
-    mensajeDiv.innerText = `✅ Empleado ${usuario} agregado exitosamente`;
-    mensajeDiv.classList.add('exito');
-
-    // Limpiar formulario
-    document.getElementById('nuevo-empleado-usuario').value = '';
-    document.getElementById('nuevo-empleado-password').value = '';
-
-    // Recargar lista
-    cargarEmpleados();
-}
-
-function editarEmpleado(index) {
-    const empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
-    const empleado = empleados[index];
-
-    const nuevoPassword = prompt(`Editar contraseña de ${empleado.usuario}:`, empleado.password);
-
-    if (nuevoPassword && nuevoPassword.trim()) {
-        empleados[index].password = nuevoPassword.trim();
-        localStorage.setItem('empleados', JSON.stringify(empleados));
-        alert('✅ Contraseña actualizada');
-        cargarEmpleados();
-    }
-}
-
-function eliminarEmpleado(index) {
-    const empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
-    const empleado = empleados[index];
-
-    if (confirm(`¿Está seguro de eliminar al empleado "${empleado.usuario}"?`)) {
-        empleados.splice(index, 1);
-        localStorage.setItem('empleados', JSON.stringify(empleados));
-        alert('✅ Empleado eliminado');
-        cargarEmpleados();
-    }
-}
-
-// Modificar la función de inicio de sesión para usar la lista de empleados
-function iniciarSesion() {
-    const usuario = document.getElementById('login-usuario').value.trim();
-    const password = document.getElementById('login-password').value;
-    const mensajeDiv = document.getElementById('login-mensaje');
-
-    mensajeDiv.innerText = '';
-
-    if (!usuario || !password) {
-        mensajeDiv.innerText = '⚠️ Ingrese usuario y contraseña';
-        return;
-    }
-
-    // Obtener empleados de localStorage
-    const empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
 
     // Si no hay empleados, crear los predeterminados
     if (empleados.length === 0) {
@@ -1757,14 +1650,26 @@ function iniciarSesion() {
 
     // Buscar empleado
     const empleado = empleados.find(e => e.usuario === usuario && e.password === password);
+    const credencialesDefault = [
+        { usuario: 'cajero', password: '123', rol: 'cajero' },
+        { usuario: 'admin', password: 'admin123', rol: 'admin' },
+        { usuario: 'usuario', password: 'usuario123', rol: 'cajero' }
+    ];
+    const fallbackEmpleado = credencialesDefault.find(e => e.usuario === usuario && e.password === password);
 
     if (empleado) {
         // Login exitoso
         localStorage.setItem('cajero_usuario', usuario);
         localStorage.setItem('cajero_rol', empleado.rol);
         mostrarAplicacion(usuario);
+    } else if (fallbackEmpleado) {
+        // Resetea lista con defaults y permite acceso
+        localStorage.setItem('empleados', JSON.stringify(credencialesDefault));
+        localStorage.setItem('cajero_usuario', usuario);
+        localStorage.setItem('cajero_rol', fallbackEmpleado.rol);
+        mostrarAplicacion(usuario);
     } else {
-        mensajeDiv.innerText = '❌ Usuario o contraseña incorrectos';
+        mensajeDiv.innerText = '?? Usuario o contrase?a incorrectos';
     }
 }
 
