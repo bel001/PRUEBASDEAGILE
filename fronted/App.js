@@ -188,7 +188,7 @@ async function cargarDashboard() {
             const text = await cajaRes.text();
             try {
                 const caja = JSON.parse(text);
-                const totalHoy = (caja.EFECTIVO || 0) + (caja.YAPE || 0) + (caja.PLIN || 0) + (caja.TARJETA || 0);
+                const totalHoy = (caja.EFECTIVO || 0) + (caja.FLOW || 0);
                 document.getElementById('stat-cobrado').innerText = `S/ ${totalHoy.toFixed(2)}`;
             } catch (e) {
                 console.error("❌ Error API Caja (HTML recibido):", text.substring(0, 150));
@@ -1497,13 +1497,10 @@ async function cargarEstadoCaja() {
 
             // Caja está abierta - ACTUALIZADO CON NUEVA LÓGICA
             document.getElementById('resumen-inicial').innerText = data.monto_inicial.toFixed(2);
-            document.getElementById('resumen-efectivo').innerText = data.EFECTIVO.toFixed(2);
+            document.getElementById('resumen-efectivo').innerText = (data.EFECTIVO || 0).toFixed(2);
 
-            // Total Digital (Yape + Plin)
-            const totalDigital = (data.YAPE || 0) + (data.PLIN || 0);
-            document.getElementById('resumen-digital').innerText = totalDigital.toFixed(2);
-
-            document.getElementById('resumen-tarjeta').innerText = data.TARJETA.toFixed(2);
+            const totalFlow = (data.FLOW || 0);
+            document.getElementById('resumen-flow').innerText = totalFlow.toFixed(2);
 
             // TOTAL DEBE HABER CAJÓN (Inicial + Efectivo)
             document.getElementById('resumen-total-cajon').innerText = data.saldo_teorico_cajon.toFixed(2);

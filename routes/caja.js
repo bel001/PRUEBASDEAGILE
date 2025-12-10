@@ -51,13 +51,16 @@ router.get('/resumen-actual', async (req, res) => {
       .where('fecha_pago', '>=', ultima.fecha)
       .get();
 
-    let totales = { EFECTIVO: 0, TARJETA: 0, YAPE: 0, PLIN: 0 };
+    // Solo se manejan dos grupos: EFECTIVO y FLOW (digital)
+    let totales = { EFECTIVO: 0, FLOW: 0 };
 
     pagosSnap.forEach(doc => {
       const p = doc.data();
       const monto = Number(p.monto_pagado);
-      if (totales[p.medio_pago] !== undefined) {
-        totales[p.medio_pago] += monto;
+      if (p.medio_pago === 'EFECTIVO') {
+        totales.EFECTIVO += monto;
+      } else {
+        totales.FLOW += monto;
       }
     });
 
@@ -67,8 +70,8 @@ router.get('/resumen-actual', async (req, res) => {
     // Calcular Saldo Teórico EN CAJÓN (Solo Efectivo)
     const saldo_teorico_cajon = ultima.monto_inicial + totales.EFECTIVO;
 
-    // Calcular Saldo EN BANCO (Yape + Plin + Tarjeta)
-    const saldo_banco = totales.YAPE + totales.PLIN + totales.TARJETA;
+    // Calcular Saldo EN BANCO (todo lo digital = FLOW)
+    const saldo_banco = totales.FLOW;
 
     res.json({
       caja_id: ultima.id,
