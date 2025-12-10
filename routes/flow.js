@@ -30,7 +30,8 @@ router.post('/crear-pago', async (req, res) => {
             });
         }
 
-        const BASE_URL = process.env.FRONTEND_URL || 'https://agile-prestamos-nn7p.onrender.com';
+        const FRONTEND_URL = process.env.FRONTEND_URL || 'https://agile-prestamos-nn7p.onrender.com';
+        const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
 
         console.log(`🔵 Creando pago Flow para cuota ${cuota_id}, monto S/${monto}`);
 
@@ -40,8 +41,8 @@ router.post('/crear-pago', async (req, res) => {
             subject: `Pago de cuota - ${cliente_nombre || 'Cliente'}`,
             amount: monto,
             email: cliente_email,
-            urlConfirmation: `${BASE_URL}/flow/webhook`,
-            urlReturn: `${BASE_URL}?pago=flow&cuota_id=${cuota_id}`
+            urlConfirmation: `${BACKEND_URL}/flow/webhook`,
+            urlReturn: `${FRONTEND_URL}?pago=flow&cuota_id=${cuota_id}`
         });
 
         res.json({
