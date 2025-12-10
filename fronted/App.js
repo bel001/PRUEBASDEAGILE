@@ -1673,6 +1673,62 @@ function cargarEmpleados() {
     }
 }
 
+// Modificar la función de inicio de sesión para usar la lista de empleados
+function iniciarSesion() {
+    const usuario = document.getElementById('login-usuario').value.trim();
+    const password = document.getElementById('login-password').value;
+    const mensajeDiv = document.getElementById('login-mensaje');
+
+    mensajeDiv.innerText = '';
+
+    if (!usuario || !password) {
+        mensajeDiv.innerText = '⚠️ Ingrese usuario y contraseña';
+        return;
+    }
+
+    // Obtener empleados de localStorage (robusto ante datos corruptos)
+    let empleados = [];
+    try {
+        empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
+        if (!Array.isArray(empleados)) empleados = [];
+    } catch (e) {
+        empleados = [];
+    }
+
+    // Si no hay empleados, crear los predeterminados
+    if (empleados.length === 0) {
+        empleados = [
+            { usuario: 'cajero', password: '123', rol: 'cajero' },
+            { usuario: 'admin', password: 'admin123', rol: 'admin' },
+            { usuario: 'usuario', password: 'usuario123', rol: 'cajero' }
+        ];
+        localStorage.setItem('empleados', JSON.stringify(empleados));
+    }
+
+    // Buscar empleado
+    let empleado = empleados.find(e => e.usuario === usuario && e.password === password);
+
+    // Intento de recuperación: si no coincide, resetear lista a defaults y volver a buscar
+    if (!empleado) {
+        const credencialesDefault = [
+            { usuario: 'cajero', password: '123', rol: 'cajero' },
+            { usuario: 'admin', password: 'admin123', rol: 'admin' },
+            { usuario: 'usuario', password: 'usuario123', rol: 'cajero' }
+        ];
+        localStorage.setItem('empleados', JSON.stringify(credencialesDefault));
+        empleado = credencialesDefault.find(e => e.usuario === usuario && e.password === password);
+    }
+
+    if (empleado) {
+        // Login exitoso
+        localStorage.setItem('cajero_usuario', usuario);
+        localStorage.setItem('cajero_rol', empleado.rol);
+        mostrarAplicacion(usuario);
+    } else {
+        mensajeDiv.innerText = '⚠️ Usuario o contraseña incorrectos';
+    }
+}
+
 // ==================== HISTORIAL DE PAGOS Y ANULACIONES ====================
 async function verHistorial(cuotaId, numeroCuota, clienteNombre, clienteDoc) {
     document.getElementById('historial-num-cuota').innerText = numeroCuota;
