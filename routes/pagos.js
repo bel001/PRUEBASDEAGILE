@@ -29,6 +29,13 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Faltan datos obligatorios' });
   }
 
+  // Solo se permiten EFECTIVO o FLOW; cualquier otro medio se rechaza
+  const medioNormalizado = medio_pago === 'EFECTIVO' ? 'EFECTIVO' : (medio_pago === 'FLOW' ? 'FLOW' : null);
+  if (!medioNormalizado) {
+    return res.status(400).json({ error: 'Medio de pago no soportado. Use EFECTIVO o FLOW.' });
+  }
+  const medioPago = medioNormalizado;
+
   try {
     // 1. Validar Caja
     const abierta = await cajaAbiertaHoy();
@@ -103,7 +110,7 @@ router.post('/', async (req, res) => {
     // RF7: "El sistema debe registrar el monto final efectivamente ingresado" -> monto_real_recibido
     // Aqui asumimos monto_pagado es lo procesado.
 
-    const { montoCobrar, ajuste } = aplicarRedondeo(monto_pagado, medio_pago);
+    const { montoCobrar, ajuste } = aplicarRedondeo(monto_pagado, medioPago);
 
     // Recalcular distribucion con montoCobrar (agregando ajuste si efectivo)
     // Si hubo redondeo, el montoCobrar es el oficial. Re-aplicamos lógica distribución.
@@ -121,7 +128,7 @@ router.post('/', async (req, res) => {
     // Esto permite que redondeos hacia abajo (ej: 8.33 -> 8.30) marquen la cuota como pagada
     let nuevo_saldo = Number((cuota.saldo_pendiente - abono_capital).toFixed(2));
 
-    if (nuevo_saldo > 0 && nuevo_saldo <= 1.00 && medio_pago === 'EFECTIVO') {
+    if (nuevo_saldo > 0 && nuevo_saldo <= 1.00 && medioPago === 'EFECTIVO') {
       // Ajustar para considerar la diferencia de redondeo como pagada
       console.log(`📌 Tolerancia de redondeo aplicada: S/${nuevo_saldo} absorbido`);
       abono_capital = cuota.saldo_pendiente; // Pagar el saldo completo
@@ -141,7 +148,7 @@ router.post('/', async (req, res) => {
       fecha_pago: new Date().toISOString(),
       monto_pagado: montoCobrar, // Monto oficial sistema
       monto_recibido: monto_pagado, // Monto físico
-      medio_pago,
+      medio_pago: medioPago,
       redondeo_ajuste: ajuste,
       desglose: {
         capital: abono_capital,
@@ -172,7 +179,7 @@ router.post('/', async (req, res) => {
       pago_id: pagoId,
       cuota_id,
       monto: monto_pagado,
-      medio: medio_pago,
+      medio: medioPago,
       fecha: new Date().toISOString()
     });
 
