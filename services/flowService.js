@@ -100,26 +100,22 @@ async function createPayment(data) {
  * @param {number} delayMs - Delay entre reintentos en ms (default: 2000)
  */
 async function getPaymentStatus(token, maxRetries = 2, delayMs = 2000) {
-    // MODO MOCK LOCAL: Si el token es de simulación
+    // MODO MOCK LOCAL
     if (token.startsWith('MOCK_')) {
-        console.log('🧪 MODO MOCK: Simulando consulta de estado para', token);
-        // Token formato: MOCK_XXX_TIMESTAMP
+        console.log('?? MODO MOCK: Simulando consulta de estado para', token);
         const parts = token.split('_');
-        const commerceOrder = parts[1] || '123456';
-
         return {
-            status: 2, // 2 = Pagada
-            commerceOrder: commerceOrder,
-            amount: 100, // Dummy (deberíamos guardarla si queremos exactitud, pero para mock ok)
-            subject: 'Pago Simulado (Mock)',
+            status: 2,
+            commerceOrder: parts[1] || '12345',
+            amount: 100,
             payer: 'tester@localhost',
-            token: token
+            token
         };
     }
 
     const params = {
         apiKey: API_KEY,
-        token: token
+        token
     };
 
     params.s = generateSignature(params);
@@ -128,50 +124,38 @@ async function getPaymentStatus(token, maxRetries = 2, delayMs = 2000) {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            console.log(`🔄 Consultando estado pago Flow (intento ${attempt}/${maxRetries})...`);
+            console.log(`?? Consultando estado pago Flow (intento ${attempt}/${maxRetries})...`);
 
-            const formData = new URLSearchParams();
-            Object.keys(params).forEach(key => {
-                formData.append(key, params[key]);
-            });
-
-            const response = await axios.post(`${FLOW_BASE_URL}/payment/getStatus`, formData.toString(), {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
+            const response = await axios.get(`${FLOW_BASE_URL}/payment/getStatus`, {
+                params,
                 timeout: 15000
             });
 
-            console.log('✅ Flow payment status:', response.data);
+            console.log('? Flow payment status:', response.data);
             return response.data;
 
         } catch (error) {
             lastError = error;
+
             const errorData = error.response?.data;
             const errorCode = errorData?.code;
             const errorMsg = errorData?.message || error.message;
 
-            console.error(`❌ Error Flow getStatus (intento ${attempt}):`, errorData || errorMsg);
+            console.error(`? Error Flow getStatus (intento ${attempt}):`, errorData || errorMsg);
 
-            // Errores que NO merecen reintento
-            const noRetryErrors = [1, 2, 3, 4]; // errores de autenticación/parámetros
-            if (noRetryErrors.includes(errorCode)) {
-                console.error('❌ Error permanente de Flow, no se reintentará');
+            if ([1, 2, 3, 4].includes(errorCode)) {
                 throw new Error(`Flow Error ${errorCode}: ${errorMsg}`);
             }
 
-            // Error 105 (No services available) y otros temporales - reintentar
             if (attempt < maxRetries) {
-                console.log(`⏳ Esperando ${delayMs}ms antes de reintentar...`);
+                console.log(`? Reintentando en ${delayMs}ms...`);
                 await sleep(delayMs);
-                delayMs *= 1.5; // Backoff exponencial suave
+                delayMs *= 1.5;
             }
         }
     }
 
-    // Si llegamos aquí, agotamos reintentos
-    console.error('❌ Agotados los reintentos para getPaymentStatus');
-    throw new Error(`Error consultando estado del pago después de ${maxRetries} intentos`);
+    throw new Error(`Error consultando estado del pago despu?s de ${maxRetries} intentos`);
 }
 
 /**
