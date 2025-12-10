@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/firebase'); // Cambiado a Firebase
+const { recalcularPrestamoDesdeCuotas } = require('../services/pagosService');
 
 const MAX_CUOTAS = 24;
 const MAX_MONTO = 20000;
@@ -122,6 +123,19 @@ router.get('/cliente/:cliente_id', async (req, res) => {
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .sort((a, b) => a.numero_cuota - b.numero_cuota);
 
+
+    // Recalcular saldo/estado del pr?stamo y sincronizar campos
+    const resumenPrestamo = await recalcularPrestamoDesdeCuotas(db, prestamo.id);
+
+    // Historial de pagos del pr?stamo (para mostrar parcialidades)
+    const pagosSnap = await db.collection('pagos')
+      .where('prestamo_id', '==', prestamo.id)
+      .get();
+
+    const pagosPrestamo = pagosSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => new Date(b.fecha_pago) - new Date(a.fecha_pago));
+
     // Obtener datos del cliente para completar (opcional)
     const clienteSnap = await db.collection('clientes').doc(cliente_id).get();
     const clienteData = clienteSnap.exists ? clienteSnap.data() : {};
@@ -129,11 +143,15 @@ router.get('/cliente/:cliente_id', async (req, res) => {
     res.json({
       prestamo: {
         ...prestamo,
+        saldo_restante: resumenPrestamo.saldoRestante,
+        monto_pagado_total: resumenPrestamo.montoPagadoTotal,
+        estado: resumenPrestamo.estado,
         cliente_nombre: clienteData.nombre,
         cliente_documento: clienteData.documento,
         cliente_email: clienteData.email
       },
-      cuotas
+      cuotas,
+      pagos: pagosPrestamo
     });
 
   } catch (err) {

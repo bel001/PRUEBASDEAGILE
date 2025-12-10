@@ -425,6 +425,17 @@
                                         id="pago-cliente-nombre"></span></p>
                                 <p style="margin: 5px 0;"><strong>Préstamo:</strong> S/ <span
                                         id="pago-monto-total"></span> en <span id="pago-num-cuotas"></span> cuotas</p>
+                                <p style="margin: 5px 0;"><strong>Estado:</strong> <span
+                                        id="pago-estado-prestamo">-</span></p>
+                                <p style="margin: 5px 0;"><strong>Saldo restante:</strong> S/ <span
+                                        id="pago-saldo-restante">0.00</span></p>
+                                <div id="panel-estado-prestamo" style="margin-top: 10px; display: none;">
+                                    <div style="font-size: 0.9em; color: #2c3e50; margin-bottom: 6px;"><strong>Historial de pagos (?ltimos):</strong></div>
+                                    <div id="lista-pagos-prestamo" style="max-height: 120px; overflow-y: auto; font-size: 0.9em; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #dfe6e9;">
+                                        <em>Sin pagos registrados</em>
+                                    </div>
+                                </div>
+
                                 <button class="btn-small" style="background: #3498db; margin-top: 10px;"
                                     onclick="verEstadoCuenta()">
                                     📋 Ver Estado de Cuenta Completo

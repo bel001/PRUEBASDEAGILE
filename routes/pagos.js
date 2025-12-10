@@ -3,6 +3,10 @@ const router = express.Router();
 const db = require('../db/firebase'); // Conexión Firebase
 const { aplicarRedondeo } = require('../services/pagoService');
 const { calcularMora, esVencida } = require('../services/moraService');
+const {
+  recalcularPrestamoDesdeCuotas,
+  agregarPagoAHistorialPrestamo
+} = require('../services/pagosService');
 const { enviarComprobanteEmail } = require('../services/emailService');
 
 // Helper: Verificar si la caja está abierta
@@ -97,7 +101,7 @@ router.post('/', async (req, res) => {
     // validamos que no paguen más de la cuenta si es pago total estricto)
     // Pero permitimos redondeo hacia arriba en efectivo, así que el "cambio" se maneja en frontend o caja chica?
     // RF7: "El sistema debe registrar el monto final efectivamente ingresado" -> monto_real_recibido
-    // Aquí asumimos monto_pagado es lo procesado.
+    // Aqui asumimos monto_pagado es lo procesado.
 
     const { montoCobrar, ajuste } = aplicarRedondeo(monto_pagado, medio_pago);
 
@@ -163,35 +167,21 @@ router.post('/', async (req, res) => {
     // Ejecutamos el batch
     await batch.commit();
 
-    // 5. Verificar si TODAS las cuotas del préstamo están pagadas
-    // Si es así, marcar el préstamo como cancelado para permitir nuevos préstamos
-    if (pagada) {
-      const prestamo_id = cuota.prestamo_id;
-      const cuotasSnapshot = await db.collection('cuotas')
-        .where('prestamo_id', '==', prestamo_id)
-        .get();
+    // 5. Registrar en historial del prestamo y recalcular estado/saldo
+    await agregarPagoAHistorialPrestamo(db, cuota.prestamo_id, {
+      pago_id: pagoId,
+      cuota_id,
+      monto: monto_pagado,
+      medio: medio_pago,
+      fecha: new Date().toISOString()
+    });
 
-      const todasPagadas = cuotasSnapshot.docs.every(doc => {
-        const c = doc.data();
-        // La cuota actual ya está actualizada localmente, verificamos por ID
-        if (doc.id === cuota_id) return true; // Esta ya la pagamos
-        return c.pagada === true;
-      });
+    const resumenPrestamo = await recalcularPrestamoDesdeCuotas(db, cuota.prestamo_id, cuota_id);
 
-      if (todasPagadas) {
-        // Marcar préstamo como CANCELADO (terminado)
-        await db.collection('prestamos').doc(prestamo_id).update({
-          cancelado: true,
-          fecha_cancelacion: new Date().toISOString()
-        });
-        console.log(`✅ Préstamo ${prestamo_id} marcado como cancelado - todas las cuotas pagadas`);
-      }
-    }
-
-    // 6. Enviar Email (Opcional, fuera del proceso crítico)
+    // 6. Enviar Email (Opcional, fuera del proceso critico)
     if (canal_comprobante === 'EMAIL' && clienteEmail) {
-      // Aquí iría tu lógica de email, la dejamos pendiente para no bloquear
-      console.log("Simulando envío de email a:", clienteEmail);
+      // Aqui iria tu logica de email, la dejamos pendiente para no bloquear
+      console.log("Simulando envio de email a:", clienteEmail);
     }
 
     res.json({
@@ -199,7 +189,9 @@ router.post('/', async (req, res) => {
       monto_cobrado: montoCobrar,
       nuevo_saldo,
       cuota_pagada: pagada,
-      comprobante: { serie: 'F001', numero: pagoId.substring(0, 8) }
+      comprobante: { serie: 'F001', numero: pagoId.substring(0, 8) },
+      estado_prestamo: resumenPrestamo?.estado,
+      saldo_prestamo: resumenPrestamo?.saldoRestante
     });
 
   } catch (err) {

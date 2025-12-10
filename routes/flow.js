@@ -5,7 +5,8 @@ const { createPayment, getPaymentStatus } = require('../services/flowService');
 const {
     calcularEstadoCuota,
     distribuirPagoCuota,
-    actualizarPrestamoSiPagado
+    recalcularPrestamoDesdeCuotas,
+    agregarPagoAHistorialPrestamo
 } = require('../services/pagosService');
 
 // POST /flow/crear-pago
@@ -156,6 +157,17 @@ async function procesarPagoAprobado(paymentData, token) {
     await batch.commit();
     console.log(`?Y'? Pago guardado en Firebase correctamente.`);
 
+    // 3b. Registrar pago en historial del préstamo
+    await agregarPagoAHistorialPrestamo(db, cuota.prestamo_id, {
+        pago_id: pagoRef.id,
+        cuota_id,
+        monto: monto_pagado,
+        medio: 'FLOW',
+        flow_token: token,
+        flow_order: paymentData.flowOrder,
+        fecha: new Date().toISOString()
+    });
+
     // 4. Generar comprobante
     try {
         const prestamoSnap = await db.collection('prestamos').doc(cuota.prestamo_id).get();
@@ -190,12 +202,12 @@ async function procesarPagoAprobado(paymentData, token) {
         console.error('?s???? Error generando comprobante:', errReceipt.message);
     }
 
-    // 5. Verificar si pr??stamo est?? completo
-    if (pagada) {
-        const completado = await actualizarPrestamoSiPagado(db, cuota.prestamo_id, cuota_id);
-        if (completado) {
-            console.log(`?YZ% PR?%STAMO ${cuota.prestamo_id} COMPLETADO`);
-        }
+    // 5. Recalcular estado del préstamo (saldo, pagado/parcial)
+    const resumenPrestamo = await recalcularPrestamoDesdeCuotas(db, cuota.prestamo_id, cuota_id);
+    if (resumenPrestamo.cancelado) {
+        console.log(`?YZ% PR?%STAMO ${cuota.prestamo_id} COMPLETADO`);
+    } else {
+        console.log(`?Y" Prestamo ${cuota.prestamo_id} pendiente. Saldo S/${resumenPrestamo.saldoRestante}`);
     }
 
     return {
@@ -206,7 +218,9 @@ async function procesarPagoAprobado(paymentData, token) {
         nuevo_saldo: nuevoSaldo,
         pagada,
         abono_capital: abonoCapital,
-        abono_mora: abonoMora
+        abono_mora: abonoMora,
+        estado_prestamo: resumenPrestamo.estado,
+        saldo_prestamo: resumenPrestamo.saldoRestante
     };
 }
 

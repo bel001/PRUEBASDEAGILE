@@ -1,7 +1,8 @@
+const admin = require('firebase-admin');
 const { calcularMora, esVencida } = require('./moraService');
 
 /**
- * Calcula estado de cuota (mora y totales)
+ * Calcula estado de cuota (mora y totales).
  * @param {Object} cuota
  * @param {number|string} cuota.saldo_pendiente
  * @param {string} cuota.fecha_vencimiento - ISO yyyy-mm-dd
@@ -51,32 +52,84 @@ function distribuirPagoCuota({ montoPagado, saldoActual, moraCalculada }) {
 }
 
 /**
- * Marca préstamo como cancelado si todas las cuotas están pagadas.
+ * Recalcula saldo y estado del préstamo tomando todas sus cuotas.
+ * Actualiza campos: saldo_restante, monto_pagado_total, estado, cancelado, fecha_cancelacion (si aplica).
  */
-async function actualizarPrestamoSiPagado(db, prestamoId, cuotaId) {
-    const todasCuotas = await db.collection('cuotas')
+async function recalcularPrestamoDesdeCuotas(db, prestamoId, cuotaId) {
+    const cuotasSnap = await db.collection('cuotas')
         .where('prestamo_id', '==', prestamoId)
         .get();
 
-    const pendientes = todasCuotas.docs.filter(doc => {
-        if (cuotaId && doc.id === cuotaId) return false;
-        return doc.data().pagada === false;
+    let saldoRestante = 0;
+    let montoTotal = 0;
+    let pendientes = 0;
+
+    cuotasSnap.docs.forEach((doc) => {
+        const c = doc.data();
+        saldoRestante += Number(c.saldo_pendiente || 0);
+        montoTotal += Number(c.monto_cuota || 0);
+        if (!c.pagada) pendientes += 1;
     });
 
-    if (pendientes.length === 0) {
-        await db.collection('prestamos').doc(prestamoId).update({
-            cancelado: true,
-            estado: 'PAGADO',
-            fecha_cancelacion: new Date().toISOString()
-        });
-        return true;
+    const cancelado = saldoRestante <= 0.5 || pendientes === 0;
+    const estado = cancelado ? 'PAGADO' : 'PENDIENTE';
+    const montoPagadoTotal = Math.max(0, Number((montoTotal - saldoRestante).toFixed(2)));
+
+    const updateData = {
+        saldo_restante: Number(saldoRestante.toFixed(2)),
+        monto_pagado_total: montoPagadoTotal,
+        estado,
+        cancelado
+    };
+
+    if (cancelado) {
+        updateData.fecha_cancelacion = new Date().toISOString();
     }
 
-    return false;
+    await db.collection('prestamos').doc(prestamoId).set(updateData, { merge: true });
+
+    return {
+        saldoRestante: updateData.saldo_restante,
+        montoTotal,
+        montoPagadoTotal,
+        cancelado,
+        estado
+    };
+}
+
+/**
+ * Marca préstamo como cancelado si todas las cuotas están pagadas (compatibilidad previa).
+ */
+async function actualizarPrestamoSiPagado(db, prestamoId, cuotaId) {
+    const resumen = await recalcularPrestamoDesdeCuotas(db, prestamoId, cuotaId);
+    return resumen.cancelado;
+}
+
+/**
+ * Agrega un pago al historial del préstamo (array `historial_pagos`).
+ */
+async function agregarPagoAHistorialPrestamo(db, prestamoId, pago) {
+    const pagoReducido = {
+        pago_id: pago.pago_id,
+        cuota_id: pago.cuota_id,
+        monto: Number(pago.monto),
+        medio: pago.medio,
+        flow_token: pago.flow_token || null,
+        flow_order: pago.flow_order || null,
+        fecha: pago.fecha || new Date().toISOString()
+    };
+
+    await db.collection('prestamos').doc(prestamoId).set({
+        historial_pagos: admin.firestore.FieldValue.arrayUnion(pagoReducido)
+    }, { merge: true });
+
+    return pagoReducido;
 }
 
 module.exports = {
     calcularEstadoCuota,
     distribuirPagoCuota,
-    actualizarPrestamoSiPagado
+    recalcularPrestamoDesdeCuotas,
+    actualizarPrestamoSiPagado,
+    agregarPagoAHistorialPrestamo
 };

@@ -935,6 +935,31 @@ async function buscarClienteParaPago() {
         document.getElementById('pago-cliente-nombre').innerText = data.prestamo.cliente_nombre;
         document.getElementById('pago-monto-total').innerText = data.prestamo.monto_total;
         document.getElementById('pago-num-cuotas').innerText = data.prestamo.num_cuotas;
+        const saldoRestante = data.prestamo.saldo_restante !== undefined
+            ? Number(data.prestamo.saldo_restante)
+            : data.cuotas.reduce((s, c) => s + Number(c.saldo_pendiente || 0), 0);
+        const estadoPrestamo = saldoRestante > 0.5
+            ? `Pendiente - Falta pagar: S/ ${saldoRestante.toFixed(2)}`
+            : 'Pagado';
+        document.getElementById('pago-estado-prestamo').innerText = estadoPrestamo;
+        document.getElementById('pago-saldo-restante').innerText = saldoRestante.toFixed(2);
+
+        const panelHistorial = document.getElementById('panel-estado-prestamo');
+        const listaPagosDiv = document.getElementById('lista-pagos-prestamo');
+        if (data.pagos && data.pagos.length > 0) {
+            panelHistorial.style.display = 'block';
+            const ultimos = data.pagos.slice(0, 5);
+            listaPagosDiv.innerHTML = ultimos.map(p => `
+                <div style="padding:6px 0; border-bottom:1px dashed #eee;">
+                    <div><strong>${new Date(p.fecha_pago || p.fecha).toLocaleDateString()}</strong> - S/ ${Number(p.monto_pagado || p.monto || 0).toFixed(2)}</div>
+                    <div style="font-size:0.85em; color:#555;">${p.medio_pago || p.medio || 'N/A'} ${p.flow_order ? `(Flow ${p.flow_order})` : ''}</div>
+                </div>
+            `).join('');
+        } else {
+            panelHistorial.style.display = 'block';
+            listaPagosDiv.innerHTML = '<em>Sin pagos registrados</em>';
+        }
+
 
         // Llenar selector de cuotas
         const selectCuota = document.getElementById('select-cuota');
@@ -1980,8 +2005,9 @@ function verEstadoCuenta() {
     // Calcular resumen
     const cuotasPagadas = cuotas.filter(c => c.pagada).length;
     const cuotasPendientes = cuotas.filter(c => !c.pagada).length;
-    const totalPagado = cuotas.filter(c => c.pagada).reduce((sum, c) => sum + c.monto_cuota, 0);
-    const totalPendiente = cuotas.filter(c => !c.pagada).reduce((sum, c) => sum + c.saldo_pendiente, 0);
+    const totalPagado = prestamo.monto_pagado_total ?? cuotas.filter(c => c.pagada).reduce((sum, c) => sum + c.monto_cuota, 0);
+    const totalPendiente = prestamo.saldo_restante ?? cuotas.filter(c => !c.pagada).reduce((sum, c) => sum + c.saldo_pendiente, 0);
+    const estadoPrestamo = totalPendiente <= 0.5 ? 'Pagado' : `Pendiente - Falta pagar: S/ ${totalPendiente.toFixed(2)}`;
 
     document.getElementById('estado-cuenta-resumen').innerHTML = `
         <div style="display: flex; justify-content: space-around; text-align: center;">
@@ -1994,10 +2020,11 @@ function verEstadoCuenta() {
                 <div>Cuotas Pendientes</div>
             </div>
             <div>
-                <div style="font-size: 1.5em; font-weight: bold; color: #2c3e50;">S/ ${totalPendiente.toFixed(2)}</div>
+                <div style="font-size: 1.5em; font-weight: bold; color: #2c3e50;">S/ ${Number(totalPendiente).toFixed(2)}</div>
                 <div>Deuda Total</div>
             </div>
         </div>
+        <div style="margin-top:8px; text-align:center; font-weight:bold; color:${totalPendiente <= 0.5 ? '#27ae60' : '#e67e22'};">${estadoPrestamo}</div>
     `;
 
     // Llenar tabla
