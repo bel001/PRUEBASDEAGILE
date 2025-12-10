@@ -33,9 +33,26 @@ function sleep(ms) {
 }
 
 /**
- * Crear orden de pago en Flow
+ * Crea una orden de pago en Flow
+ * @param {Object} data - Datos del pago (monto, email, orden, etc.)
  */
 async function createPayment(data) {
+    // MODO MOCK LOCAL: Si estamos en entorno de pruebas local, no llamar a Flow
+    if (process.env.FLOW_ENV === 'local_mock') {
+        console.log('🧪 MODO MOCK: Simulando creación de pago Flow');
+        // Codificar commerceOrder en el token para recuperarlo después
+        const mockToken = `MOCK_${data.commerceOrder}_${Date.now()}`;
+
+        // Retornamos una URL local para "pagar"
+        const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
+        return {
+            token: mockToken,
+            url: `${baseUrl}/flow/mock/pay?token=${mockToken}`, // Token en query param
+            flowOrder: 123456
+        };
+    }
+
+    // MODO NORMAL (Sandbox/Producción)
     // Flow requiere mínimo S/. 2.00 PEN
     const finalAmount = Math.max(Math.round(data.amount), 2);
 
@@ -46,9 +63,9 @@ async function createPayment(data) {
         currency: 'PEN',
         amount: finalAmount,
         email: data.email,
+        paymentMethod: 9, // 9 = All methods
         urlConfirmation: data.urlConfirmation,
         urlReturn: data.urlReturn,
-        paymentMethod: 9
     };
 
     params.s = generateSignature(params);
@@ -83,6 +100,23 @@ async function createPayment(data) {
  * @param {number} delayMs - Delay entre reintentos en ms (default: 5000)
  */
 async function getPaymentStatus(token, maxRetries = 5, delayMs = 5000) {
+    // MODO MOCK LOCAL: Si el token es de simulación
+    if (token.startsWith('MOCK_')) {
+        console.log('🧪 MODO MOCK: Simulando consulta de estado para', token);
+        // Token formato: MOCK_XXX_TIMESTAMP
+        const parts = token.split('_');
+        const commerceOrder = parts[1] || '123456';
+
+        return {
+            status: 2, // 2 = Pagada
+            commerceOrder: commerceOrder,
+            amount: 100, // Dummy (deberíamos guardarla si queremos exactitud, pero para mock ok)
+            subject: 'Pago Simulado (Mock)',
+            payer: 'tester@localhost',
+            token: token
+        };
+    }
+
     const params = {
         apiKey: API_KEY,
         token: token

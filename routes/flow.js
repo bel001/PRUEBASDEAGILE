@@ -523,4 +523,96 @@ router.post('/sincronizar-cuota', async (req, res) => {
     }
 });
 
+// GET /flow/mock/pay - Página simulada de pago (Solo para desarrollo)
+router.get('/mock/pay', (req, res) => {
+    const { token } = req.query;
+    if (!token) return res.send('<h1>Error: Falta token</h1>');
+
+    // Extraer datos visuales del token
+    const parts = token.split('_');
+    const commerceOrder = parts[1] || '???';
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Flow Mock Payment</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 40px; background: #f5f6fa;">
+            <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto;">
+                <h1 style="color: #2c3e50; margin-bottom: 10px;">💸 Flow Local Mock</h1>
+                <div style="background: #e1f5fe; color: #0277bd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <strong>Ambiente de Simulación</strong><br>
+                    No se está realizando ningún cobro real.
+                </div>
+                
+                <div style="text-align: left; margin: 30px 0; font-size: 16px;">
+                    <p><strong>Cuota ID:</strong> ${commerceOrder}</p>
+                    <p><strong>Token:</strong> <code style="background: #eee; padding: 2px 5px; border-radius: 4px;">${token}</code></p>
+                    <p><strong>Monto:</strong> S/ 100.00 (Simulado)</p>
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+
+                <button onclick="confirmar()" id="btn-pay" style="width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
+                    ✅ Simular Pago Exitoso
+                </button>
+                
+                <button onclick="cancelar()" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 10px; background: transparent; color: #7f8c8d; border: 2px solid #ecf0f1; border-radius: 8px; cursor: pointer;">
+                    ❌ Simular Cancelación
+                </button>
+
+                <p id="status" style="margin-top: 20px; color: #7f8c8d; font-size: 14px;"></p>
+            </div>
+
+            <script>
+                async function confirmar() {
+                    const btn = document.getElementById('btn-pay');
+                    const status = document.getElementById('status');
+                    
+                    btn.disabled = true;
+                    btn.innerHTML = '🔄 Procesando...';
+                    status.innerHTML = 'Contactando backend local...';
+
+                    try {
+                        // 1. Llamar al backend para simular la confirmación del pago
+                        // Usamos verificar-pago que llama a getPaymentStatus (que devolverá mock data)
+                        const res = await fetch('/flow/verificar-pago', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ token: '${token}' })
+                        });
+                        
+                        const data = await res.json();
+                        
+                        if (data.success || data.pagada || data.nuevo_saldo !== undefined) {
+                            status.innerHTML = '✅ Pago registrado! Redirigiendo...';
+                            status.style.color = 'green';
+                            
+                            setTimeout(() => {
+                                // 2. Redirigir al frontend como lo haría Flow
+                                window.location.href = '/?pago=flow&token=${token}';
+                            }, 1000);
+                        } else {
+                            throw new Error(data.error || 'Error desconocido');
+                        }
+                    } catch (e) {
+                        btn.disabled = false;
+                        btn.innerHTML = '✅ Simular Pago Exitoso';
+                        status.innerHTML = '❌ Error: ' + e.message;
+                        status.style.color = 'red';
+                    }
+                }
+
+                function cancelar() {
+                     window.location.href = '/?pago=error&token=${token}';
+                }
+            </script>
+        </body>
+        </html>
+    `;
+    res.send(html);
+});
+
 module.exports = router;
