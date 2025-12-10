@@ -1077,60 +1077,63 @@ async function procesarPago() {
     mensajeDiv.innerText = '';
 
     if (!montoPagar || montoPagar <= 0) {
-        mostrarToast('Ingrese un monto válido', 'warning');
+        mostrarToast('Ingrese un monto v?lido', 'warning');
         return;
     }
 
-    mensajeDiv.innerText = '⏳ Procesando pago...';
+    mensajeDiv.innerText = '? Procesando pago...';
 
-    // FLOW: Redirigir a página de pago externa
-    if (medioPago === 'FLOW') {
-        try {
-            const flowRes = await fetch(`${API_URL}/flow/crear-pago`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    cuota_id: cuotaSeleccionada.id,
-                    monto: montoPagar,
-                    cliente_nombre: prestamoActivo.prestamo.cliente_nombre,
-                    cliente_email: prestamoActivo.prestamo.cliente_email || 'cliente@example.com'
-                })
-            });
+    // Solo Flow habilitado
+    if (medioPago !== 'FLOW') {
+        mensajeDiv.innerText = 'Solo est? habilitado Flow como medio de pago.';
+        mensajeDiv.classList.add('error');
+        return;
+    }
 
-            const flowData = await flowRes.json();
+    try {
+        const flowRes = await fetch(`${API_URL}/flow/crear-pago`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cuota_id: cuotaSeleccionada.id,
+                monto: montoPagar,
+                cliente_nombre: prestamoActivo.prestamo.cliente_nombre,
+                cliente_email: prestamoActivo.prestamo.cliente_email || 'cliente@example.com'
+            })
+        });
 
-            if (flowRes.ok && flowData.url) {
-                mensajeDiv.innerHTML = `
-                    <p>🔵 Redirigiendo a Flow...</p>
-                    <p style="font-size: 0.9em; color: #666;">Si no se abre automáticamente, 
-                    <a href="${flowData.url}" target="_blank" style="color: #3498db;">haz clic aquí</a></p>
-                `;
-                // Redirigir a Flow
-                window.open(flowData.url, '_blank');
-                return;
-            } else if (flowData.requiereVerificacion) {
-                mensajeDiv.innerHTML = `
-                    <p style="color: #e67e22;">⚠️ ${flowData.error}</p>
-                    <button class="btn-primary" style="margin-top:10px; background:#f39c12;" 
-                        onclick="sincronizarCuota('${flowData.cuota_id}')">
-                        🔄 Sincronizar ahora
-                    </button>
-                `;
-                return;
-            } else {
-                mensajeDiv.innerText = `❌ Error con Flow: ${flowData.error || 'Intente nuevamente'}`;
-                mensajeDiv.classList.add('error');
-                return;
-            }
-        } catch (err) {
-            console.error('Error Flow:', err);
-            mensajeDiv.innerText = '❌ Error conectando con Flow';
+        const flowData = await flowRes.json();
+
+        if (flowRes.ok && flowData.url) {
+            mensajeDiv.innerHTML = `
+                <p>?? Redirigiendo a Flow...</p>
+                <p style="font-size: 0.9em; color: #666;">Si no se abre autom?ticamente, 
+                <a href="${flowData.url}" target="_blank" style="color: #3498db;">haz clic aqu?</a></p>
+            `;
+            window.open(flowData.url, '_blank');
+            return;
+        } else if (flowData.requiereVerificacion) {
+            mensajeDiv.innerHTML = `
+                <p style="color: #e67e22;">?? ${flowData.error}</p>
+                <button class="btn-primary" style="margin-top:10px; background:#f39c12;" 
+                    onclick="sincronizarCuota('${flowData.cuota_id}')">
+                    ?? Sincronizar ahora
+                </button>
+            `;
+            return;
+        } else {
+            mensajeDiv.innerText = `? Error con Flow: ${flowData.error || 'Intente nuevamente'}`;
             mensajeDiv.classList.add('error');
             return;
         }
+    } catch (err) {
+        console.error('Error Flow:', err);
+        mensajeDiv.innerText = '? Error conectando con Flow';
+        mensajeDiv.classList.add('error');
+        return;
     }
-
-    // PAGO NORMAL (Efectivo, Yape, Plin, Tarjeta)
+}
+// PAGO NORMAL (Efectivo, Yape, Plin, Tarjeta)
     try {
         const res = await fetch(`${API_URL}/pagos`, {
             method: 'POST',
