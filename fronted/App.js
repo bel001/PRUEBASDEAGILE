@@ -658,7 +658,6 @@ function mostrarSeccion(seccionId) {
         'prestamos': 'Préstamos',
         'pagos': 'Cobranza',
         'caja': 'Control de Caja',
-        'calendario': 'Calendario de Vencimientos',
         'empleados': 'Empleados',
         'config': 'Configuración del Sistema'
     };
@@ -684,9 +683,6 @@ function mostrarSeccion(seccionId) {
             break;
         case 'caja':
             cargarEstadoCaja();
-            break;
-        case 'calendario':
-            cargarCalendario();
             break;
         case 'empleados':
             cargarEmpleados();
@@ -2547,7 +2543,7 @@ mostrarSeccion = function (id) {
 
     if (id === 'dashboard') cargarDashboard();
     if (id === 'clientes') cargarClientes();
-    if (id === 'calendario') cargarCalendario();
+
     if (id === 'empleados') cargarEmpleados();
     if (id === 'config') cargarConfiguracion();
 };
