@@ -165,9 +165,15 @@ async function cargarDashboard() {
 
         // Cobrado hoy (si hay caja abierta)
         if (cajaRes.ok) {
-            const caja = await cajaRes.json();
-            const totalHoy = (caja.EFECTIVO || 0) + (caja.YAPE || 0) + (caja.PLIN || 0) + (caja.TARJETA || 0);
-            document.getElementById('stat-cobrado').innerText = `S/ ${totalHoy.toFixed(2)}`;
+            const text = await cajaRes.text();
+            try {
+                const caja = JSON.parse(text);
+                const totalHoy = (caja.EFECTIVO || 0) + (caja.YAPE || 0) + (caja.PLIN || 0) + (caja.TARJETA || 0);
+                document.getElementById('stat-cobrado').innerText = `S/ ${totalHoy.toFixed(2)}`;
+            } catch (e) {
+                console.error("❌ Error API Caja (HTML recibido):", text.substring(0, 150));
+                console.log("Caja status:", cajaRes.status);
+            }
         }
 
         // Cargar cuotas vencidas

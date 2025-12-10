@@ -12,8 +12,14 @@ const flowRoutes = require('./routes/flow');
 
 app.use(cors());
 app.use(express.json());
-// Soporte para datos de formularios (necesario para el retorno de Flow)
+// Soporte para datos de formularios
 app.use(express.urlencoded({ extended: true }));
+
+// Debug Logging Middleware
+app.use((req, res, next) => {
+  console.log(`📡 [${req.method}] ${req.path}`);
+  next();
+});
 
 // API Routes
 app.use('/clientes', clientesRoutes);
