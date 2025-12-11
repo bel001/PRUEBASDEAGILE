@@ -1897,18 +1897,12 @@ async function cerrarCaja() {
         return;
     }
 
-    // VALIDACIÓN ESTRICTA DE CUADRE
-    // Recuperar valores del reporte visible
-    const fondoCaja = parseFloat(document.getElementById('resumen-inicial').innerText || '0');
-    const ventasEfectivo = parseFloat(document.getElementById('resumen-efectivo').innerText || '0');
+    // VALIDACIÓN SIMPLE: Comparar con el TOTAL EN EFECTIVO visible en pantalla
+    const totalEfectivoSistema = parseFloat(document.getElementById('resumen-total-general').innerText || '0');
 
-    // Total que DEBE haber en cajón (Suma de los dos componentes visibles)
-    const totalEsperado = Number((fondoCaja + ventasEfectivo).toFixed(2));
-
-    // Permitir un margen de error mínimo por punto flotante (0.01) o ser estricto
-    // Se pide: "debe ser igual al total en efectivo"
-    if (Math.abs(montoReal - totalEsperado) > 0.01) {
-        alert(`❌ El dinero reportado (S/ ${montoReal.toFixed(2)}) NO COINCIDE con el total físico esperado (S/ ${totalEsperado.toFixed(2)}).\n\nDebe haber:\n Fondo: S/ ${fondoCaja.toFixed(2)}\n+ Ventas: S/ ${ventasEfectivo.toFixed(2)}\n= Total: S/ ${totalEsperado.toFixed(2)}\n\nVerifique su conteo o ajuste si es necesario.`);
+    // Se pide: "el dinero recaudado debe ser igual al total en efectivo"
+    if (Math.abs(montoReal - totalEfectivoSistema) > 0.01) {
+        alert(`❌ El dinero contado (S/ ${montoReal.toFixed(2)}) NO COINCIDE con el Total en Efectivo del sistema (S/ ${totalEfectivoSistema.toFixed(2)}).\n\nVerifique su conteo antes de cerrar.`);
         return;
     }
 

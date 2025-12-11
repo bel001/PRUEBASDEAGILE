@@ -185,24 +185,39 @@ router.get('/resumen-actual', async (req, res) => {
 
 // POST /caja/cierre
 router.post('/cierre', async (req, res) => {
-  const { total_real_efectivo } = req.body; // AHORA SOLO PIDE EL EFECTIVO REAL
+  const { total_real_efectivo } = req.body;
   if (total_real_efectivo == null) return res.status(400).json({ error: 'Falta total_real_efectivo (Monto en cajón)' });
 
   try {
     const ultima = await obtenerUltimaCaja();
     if (!ultima || ultima.cerrado) return res.status(400).json({ error: 'No hay caja abierta' });
 
-    // Recalcular totales con el mismo limite
-    const fechaApertura = new Date(ultima.fecha);
-    const fechaLimite = new Date(fechaApertura);
-    fechaLimite.setDate(fechaLimite.getDate() + 1);
-    fechaLimite.setHours(0, 0, 0, 0);
+    const fechaApertura = ultima.fecha;
+    const fechaLimite = new Date(new Date(fechaApertura).setDate(new Date(fechaApertura).getDate() + 1)).toISOString();
 
-    const pagosSnap = await db.collection('pagos')
-      .where('fecha_pago', '>=', ultima.fecha)
-      .where('fecha_pago', '<', fechaLimite.toISOString())
+    // 1. Calcular saldo teórico usando MOVIMIENTOS FÍSICOS (igual que /resumen-actual)
+    const movsSnap = await db.collection('movimientos_caja')
+      .where('fecha', '>=', fechaApertura)
+      .where('fecha', '<', fechaLimite)
       .get();
 
+    let saldo_teorico_cajon = ultima.monto_inicial;
+
+    movsSnap.forEach(doc => {
+      const m = doc.data();
+      if (m.tipo === 'ENTRADA') saldo_teorico_cajon += m.monto;
+      if (m.tipo === 'SALIDA') saldo_teorico_cajon -= m.monto;
+    });
+
+    // Redondear a 2 decimales
+    saldo_teorico_cajon = Number(saldo_teorico_cajon.toFixed(2));
+    const montoReal = Number(Number(total_real_efectivo).toFixed(2));
+
+    // 2. Obtener pagos para estadísticas (no para cuadre)
+    const pagosSnap = await db.collection('pagos')
+      .where('fecha_pago', '>=', fechaApertura)
+      .where('fecha_pago', '<', fechaLimite)
+      .get();
 
     let total_efectivo_sistema = 0;
     let total_digital_sistema = 0;
@@ -216,21 +231,15 @@ router.post('/cierre', async (req, res) => {
       }
     });
 
-    // EL CUADRE SOLO ES CONTRA EL EFECTIVO
-    const saldo_teorico_cajon = ultima.monto_inicial + total_efectivo_sistema;
+    // 3. VALIDACIÓN SIMPLE: El dinero contado debe ser igual al total teórico
+    const diferencia = Number((montoReal - saldo_teorico_cajon).toFixed(2));
 
-    // Diferencia (Sobrante o Faltante en efectivo)
-    const diferencia = Number((Number(total_real_efectivo) - saldo_teorico_cajon).toFixed(2));
-
-    // RN3: Si las operaciones no cuadran, no permite cerrar
-    // "No cuadran" implica diferencia != 0. 
-    // Considerando punto flotante, usamos un epsilon muy pequeño o comparamos estricto.
-    if (diferencia !== 0) {
+    if (Math.abs(diferencia) > 0.01) {
       return res.status(400).json({
-        error: 'La caja no cuadra. No se puede realizar el cierre.',
+        error: `La caja no cuadra. Esperado: S/ ${saldo_teorico_cajon.toFixed(2)}, Contado: S/ ${montoReal.toFixed(2)}`,
         detalle: {
           esperado: saldo_teorico_cajon,
-          real: Number(total_real_efectivo),
+          real: montoReal,
           diferencia: diferencia
         }
       });
