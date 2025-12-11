@@ -177,6 +177,7 @@ function mostrarSeccion(id) {
 function mostrarCaja() {
     mostrarSeccion('caja');
     cargarEstadoCaja();
+    cargarHistorialCaja(); // Cargar historial de movimientos
 }
 
 // ==================== MÓDULO DASHBOARD (ELIMINADO) ====================
@@ -1904,6 +1905,62 @@ async function cerrarCaja() {
         console.error(error);
         mensajeDiv.innerText = '❌ Error de conexión';
         mensajeDiv.classList.add('error');
+    }
+}
+
+// Función para cargar historial de movimientos físicos en la sesión
+async function cargarHistorialCaja() {
+    const tableBody = document.getElementById('lista-movimientos-caja');
+    tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">⏳ Cargando...</td></tr>';
+
+    try {
+        const res = await fetch(`${API_URL}/caja/movimientos-sesion`);
+
+        if (res.status === 404) {
+            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px; color: #7f8c8d;">🔒 La caja está cerrada (sin historial actual)</td></tr>';
+            return;
+        }
+
+        const movimientos = await res.json();
+
+        if (movimientos.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">No hay movimientos registrados.</td></tr>';
+            return;
+        }
+
+        let html = '';
+        movimientos.forEach(m => {
+            // Formatear Hora
+            const fecha = new Date(m.fecha);
+            const hora = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+
+            // Estilos según tipo
+            const isEntrada = m.tipo === 'ENTRADA';
+            const colorMonto = isEntrada ? '#2e7d32' : '#c62828'; // Verde / Rojo
+            const icono = isEntrada ? '📥' : '📤';
+            const signo = isEntrada ? '+' : '-';
+
+            html += `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">${hora}</td>
+                    <td style="padding: 10px;">${m.descripcion}</td>
+                    <td style="padding: 10px;">
+                        <span style="font-size: 0.9em; padding: 3px 8px; border-radius: 12px; background: ${isEntrada ? '#e8f5e9' : '#ffebee'}; color: ${colorMonto};">
+                            ${icono} ${m.tipo}
+                        </span>
+                    </td>
+                    <td style="padding: 10px; text-align: right; color: ${colorMonto}; font-weight: bold;">
+                        ${signo} S/ ${m.monto.toFixed(2)}
+                    </td>
+                </tr>
+            `;
+        });
+
+        tableBody.innerHTML = html;
+
+    } catch (error) {
+        console.error("Error cargando historial caja:", error);
+        tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: red;">❌ Error al cargar historial</td></tr>';
     }
 }
 

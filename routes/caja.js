@@ -53,6 +53,38 @@ router.post('/apertura', async (req, res) => {
   }
 });
 
+// GET /caja/movimientos-sesion - Historial de billetes/monedas (Entrada/Salida) en la sesión actual
+router.get('/movimientos-sesion', async (req, res) => {
+  try {
+    const ultima = await obtenerUltimaCaja();
+    if (!ultima || ultima.cerrado) return res.status(404).json({ error: 'No hay caja abierta' });
+
+    // Buscar movimientos desde la fecha de apertura
+    // Solo nos interesa ENTRADA (Recibido) y SALIDA (Vuelto) que se guardan en 'movimientos_caja'
+    // Esto fue implementado en pagos.js cuando se paga en EFECTIVO
+
+    // Obtener fecha límite (fin de la sesión o ahora)
+    const fechaApertura = ultima.fecha;
+
+    // Buscamos en la colección 'movimientos_caja' (creada en services/cajaService.js)
+    const movimientosSnap = await db.collection('movimientos_caja')
+      .where('fecha', '>=', fechaApertura)
+      .orderBy('fecha', 'desc')
+      .get();
+
+    const movimientos = movimientosSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    res.json(movimientos);
+
+  } catch (err) {
+    console.error("Error obteniendo movimientos caja:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /caja/resumen-actual (Cálculo manual porque Firestore no tiene SUM)
 router.get('/resumen-actual', async (req, res) => {
   try {

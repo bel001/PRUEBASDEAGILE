@@ -658,6 +658,34 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- NUEVA SECCION: Historial de Efectivo -->
+                            <div class="card" style="margin-top: 20px; grid-column: 1 / -1;">
+                                <div class="card-header" style="background: #f1f8e9; border-bottom: 2px solid #8bc34a;">
+                                    <h4 style="margin: 0; color: #33691e;">📜 Historial de Movimientos de Efectivo
+                                        (Sesión Actual)</h4>
+                                    <button class="btn-small" onclick="cargarHistorialCaja()"
+                                        style="background: #aed581; color: #1b5e20;">🔄 Actualizar</button>
+                                </div>
+                                <div class="card-body" style="padding: 0;">
+                                    <table class="tabla-clientes" style="width: 100%; margin: 0;">
+                                        <thead>
+                                            <tr style="background: #dcedc8;">
+                                                <th>Hora</th>
+                                                <th>Descripción</th>
+                                                <th>Tipo</th>
+                                                <th style="text-align: right;">Monto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="lista-movimientos-caja">
+                                            <tr>
+                                                <td colspan="4" style="text-align:center; padding: 15px;">Cargando...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
 
                         <div id="mensaje-caja" class="mensaje"></div>
