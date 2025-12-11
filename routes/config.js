@@ -11,6 +11,8 @@ router.get('/fecha', (req, res) => {
     });
 });
 
+const { db } = require('../db/firebase');
+
 // POST /config/fecha - Cambiar fecha del sistema
 router.post('/fecha', async (req, res) => {
     const { fecha } = req.body; // YYYY-MM-DD
@@ -20,6 +22,24 @@ router.post('/fecha', async (req, res) => {
     }
 
     try {
+        // VALIDACIÓN DE CAJA ABIERTA
+        // Obtener la última caja registrada
+        const cajaSnapshot = await db.collection('cierre_caja')
+            .orderBy('fecha', 'desc')
+            .limit(1)
+            .get();
+
+        if (!cajaSnapshot.empty) {
+            const ultimaCaja = cajaSnapshot.docs[0].data();
+
+            // Si la caja existe y NO está cerrada, bloquemos el cambio
+            if (ultimaCaja.cerrado === false) {
+                return res.status(400).json({
+                    error: '⚠️ Caja Abierta. Debe cerrar la caja del día actual antes de cambiar la fecha del sistema.'
+                });
+            }
+        }
+
         await setSystemDate(fecha);
         res.json({
             mensaje: 'Fecha del sistema actualizada correctamente',
