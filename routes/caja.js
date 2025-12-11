@@ -137,25 +137,41 @@ router.get('/resumen-actual', async (req, res) => {
       }
     });
 
-    // 2. Obtener Pagos Digitales (FLOW) para el reporte
+    // 2. Obtener Pagos (Tanto EFECTIVO como FLOW)
     const pagosSnap = await db.collection('pagos')
       .where('fecha_pago', '>=', fechaApertura)
       .where('fecha_pago', '<', fechaLimite)
       .get();
 
     let saldo_banco = 0;
+    let total_ventas_efectivo = 0;
+
     pagosSnap.forEach(doc => {
       const p = doc.data();
-      if (p.medio_pago !== 'EFECTIVO') {
-        saldo_banco += p.monto_pagado;
+      if (p.medio_pago === 'EFECTIVO') {
+        total_ventas_efectivo += Number(p.monto_pagado);
+      } else {
+        saldo_banco += Number(p.monto_pagado);
       }
     });
+
+    // 3. Desglose solicitado:
+    // Ventas Efectivo = Lo que entró por concepto de pagos de cuotas (monto_pagado).
+    // Fondo en Caja = El resto del dinero (Inicial + Inyecciones - Vueltos - Retiros).
+    // Fondo = TotalCajero - VentasEfectivo
+    const fondo_restante = saldo_teorico_cajon - total_ventas_efectivo;
 
     res.json({
       caja_id: ultima.id,
       monto_inicial: ultima.monto_inicial,
-      EFECTIVO: saldo_teorico_cajon, // Esto es el saldo actual disponible
+
+      EFECTIVO: saldo_teorico_cajon, // Total Dinero Físico Real
       FLOW: saldo_banco,
+
+      // Desglose visual
+      ventas_efectivo_neto: total_ventas_efectivo,
+      fondo_caja: fondo_restante,
+
       entradas_efectivo,
       salidas_efectivo,
       saldo_teorico_cajon,

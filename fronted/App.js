@@ -1805,8 +1805,11 @@ async function cargarEstadoCaja() {
             const data = await res.json();
 
             // Caja está abierta - ACTUALIZADO CON NUEVA LÓGICA
-            document.getElementById('resumen-inicial').innerText = data.monto_inicial.toFixed(2);
-            document.getElementById('resumen-efectivo').innerText = (data.EFECTIVO || 0).toFixed(2);
+            // 'resumen-inicial' AHORA MUESTRA EL FONDO RESTANTE (Inicial + Inyecciones - Vueltos - Retiros)
+            document.getElementById('resumen-inicial').innerText = (data.fondo_caja || 0).toFixed(2);
+
+            // 'resumen-efectivo' AHORA MUESTRA SOLO VENTAS (Pagos brutos de cuotas)
+            document.getElementById('resumen-efectivo').innerText = (data.ventas_efectivo_neto || 0).toFixed(2);
 
             const totalFlow = (data.FLOW || 0);
             document.getElementById('resumen-flow').innerText = totalFlow.toFixed(2);
