@@ -134,6 +134,46 @@ router.post('/', async (req, res) => {
       }
 
       vuelto = Number((efectivoEntregado - montoCobrar).toFixed(2));
+
+      // VALIDACIÓN DE FONDOS EN CAJA PARA DAR VUELTO (NUEVO)
+      if (vuelto > 0) {
+        // Calcular Saldo Actual de Caja
+        const cajaSnap = await db.collection('cierre_caja').orderBy('fecha', 'desc').limit(1).get();
+        if (!cajaSnap.empty) {
+          const caja = cajaSnap.docs[0].data();
+          if (!caja.cerrado) {
+            // Calcular saldo actual
+            const movsSnap = await db.collection('movimientos_caja')
+              .where('fecha', '>=', caja.fecha)
+              .get();
+
+            let saldoActual = caja.monto_inicial;
+            movsSnap.forEach(doc => {
+              const m = doc.data();
+              if (m.tipo === 'ENTRADA') saldoActual += m.monto;
+              if (m.tipo === 'SALIDA') saldoActual -= m.monto;
+            });
+
+            // IMPORTANTE: El billete que entrega el cliente (efectivoEntregado) se suma al saldo
+            // ANTES de dar el vuelto? Físicamente sí. 
+            // Si tengo 0 y me dan 100, tengo 100. Si debo cobrar 80, doy 20. Me quedan 80.
+            // PERO, si tengo 0 y me dan 100 y debo cobrar 10 (vuelto 90).
+            // Tengo 100 en mano (billete del cliente). Tengo que dar 90.
+            // Si el billete del cliente ES el fondo con el que doy vuelto, siempre alcanza (salvo que no tenga sencillo).
+            // LA REGLA DEL USUARIO: "restar del fondo inicial el vuelto, si este vuelto excede al total en efectivo no dejar".
+            // Interpretación Literal: Comparar Vuelto vs (SaldoPrevo).
+            // Si SaldoPrevio es 0, y vuelto es 90 -> Error. 
+            // Esto evita que el cajero acepte billetes grandes si no tiene cambio.
+
+            if (vuelto > saldoActual) {
+              return res.status(400).json({
+                error: 'INSUFICIENT_FUNDS_CAJA', // Código manejado por frontend
+                message: `No hay suficiente efectivo en caja para dar vuelto. (Saldo: S/ ${saldoActual.toFixed(2)}, Vuelto: S/ ${vuelto.toFixed(2)})`
+              });
+            }
+          }
+        }
+      }
     }
 
     // Recalcular distribucion con montoCobrar (agregando ajuste si efectivo)

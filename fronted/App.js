@@ -1435,8 +1435,14 @@ async function procesarPago() {
                 }
 
             } else {
-                mensajeDiv.innerText = `❌ Error: ${data.error}`;
-                mensajeDiv.classList.add('error');
+                if (data.error === 'INSUFICIENT_FUNDS_CAJA') {
+                    if (confirm(`${data.message}\n\n¿Desea ir a CAJA e INYECTAR EFECTIVO ahora para poder dar vuelto?`)) {
+                        mostrarInyeccionEfectivo();
+                    }
+                } else {
+                    mensajeDiv.innerText = `❌ Error: ${data.error}`;
+                    mensajeDiv.classList.add('error');
+                }
             }
         } catch (error) {
             console.error(error);
@@ -1444,6 +1450,53 @@ async function procesarPago() {
             mensajeDiv.classList.add('error');
         }
     }
+}
+
+async function mostrarInyeccionEfectivo() {
+    mostrarSeccion('caja'); // Ir a caja
+
+    // Pequeño delay para asegurar carga
+    setTimeout(async () => {
+        // Asegurar que se cargue la info
+        await cargarEstadoCaja();
+        await cargarHistorialCaja();
+
+        const montoStr = prompt("💰 INYECCIÓN DE CAJA\n\nNo hay suficiente efectivo para el vuelto.\nIngrese el monto de sencillo a ingresar (S/):");
+        if (!montoStr) return;
+
+        const monto = parseFloat(montoStr);
+        if (isNaN(monto) || monto <= 0) {
+            alert("Monto inválido");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/caja/movimiento`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipo: 'ENTRADA',
+                    monto: monto,
+                    descripcion: 'INYECCIÓN DE FONDOS (Para Vuelto)'
+                })
+            });
+
+            if (res.ok) {
+                alert("✅ Efectivo inyectado correctamente.\nAhora el saldo debería ser suficiente.");
+                cargarEstadoCaja();
+                cargarHistorialCaja();
+                // Opcional: regresar a pagos automáticamente?
+                if (confirm("¿Desea volver a la pantalla de PAGOS para reintentar?")) {
+                    mostrarSeccion('pagos');
+                }
+            } else {
+                const data = await res.json();
+                alert("❌ Error: " + data.error);
+            }
+        } catch (e) {
+            alert("❌ Error de conexión");
+        }
+    }, 500);
 }
 // ==================== GENERACIÓN DE COMPROBANTE PDF ====================
 async function sincronizarCuota(cuotaId) {

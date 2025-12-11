@@ -85,62 +85,81 @@ router.get('/movimientos-sesion', async (req, res) => {
   }
 });
 
-// GET /caja/resumen-actual (Cálculo manual porque Firestore no tiene SUM)
+const { registrarMovimientoCaja } = require('../services/cajaService');
+
+// POST /caja/movimiento - Inyección o Retiro manual
+router.post('/movimiento', async (req, res) => {
+  const { tipo, monto, descripcion } = req.body;
+  if (!['ENTRADA', 'SALIDA'].includes(tipo) || !monto || !descripcion) {
+    return res.status(400).json({ error: 'Faltan datos (tipo, monto, descripcion)' });
+  }
+
+  try {
+    const ultima = await obtenerUltimaCaja();
+    if (!ultima || ultima.cerrado) return res.status(400).json({ error: 'Debe abrir caja primero' });
+
+    // Registrar
+    await registrarMovimientoCaja(tipo, monto, `${tipo} MANUAL: ${descripcion}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /caja/resumen-actual (Cálculo basado en movimientos físicos)
 router.get('/resumen-actual', async (req, res) => {
   try {
     const ultima = await obtenerUltimaCaja();
     if (!ultima) return res.status(404).json({ error: 'No hay caja' });
     if (ultima.cerrado) return res.status(400).json({ error: 'La caja está cerrada' });
 
-    // Calcular límite superior (final del día de apertura + buffer o simplemente start of next day)
-    // Para asegurar que no traiga pagos de "futuros días" si viajamos al pasado.
-    const fechaApertura = new Date(ultima.fecha);
-    const fechaLimite = new Date(fechaApertura);
-    fechaLimite.setDate(fechaLimite.getDate() + 1);
-    fechaLimite.setHours(0, 0, 0, 0); // Inicio del día siguiente
-    // Ajuste por si la apertura fue muy cerca del cambio de día, mejor dar margen hasta fin del día de la fecha de apertura
-    // Mejor: tomamos la fecha de apertura, le sumamos 1 día calendario y cortamos a las 00:00.
+    const fechaApertura = ultima.fecha;
+    const fechaLimite = new Date(new Date(fechaApertura).setDate(new Date(fechaApertura).getDate() + 1)).toISOString();
 
-    // Buscar pagos desde la fecha de apertura hasta el limite del día
-    console.log(`🔍 [Resumen Caja] Apertura: ${ultima.fecha} | Límite: ${fechaLimite.toISOString()}`);
-
-    const pagosSnap = await db.collection('pagos')
-      .where('fecha_pago', '>=', ultima.fecha)
-      .where('fecha_pago', '<', fechaLimite.toISOString())
+    // 1. Obtener movimientos FÍSICOS (incluye pagos efectivos, inyecciones, retiros y vueltos)
+    const movsSnap = await db.collection('movimientos_caja')
+      .where('fecha', '>=', fechaApertura)
+      .where('fecha', '<', fechaLimite)
       .get();
 
-    console.log(`🔍 [Resumen Caja] Pagos encontrados: ${pagosSnap.size}`);
+    let saldo_teorico_cajon = ultima.monto_inicial;
+    let entradas_efectivo = 0;
+    let salidas_efectivo = 0;
 
-    // Solo se manejan dos grupos: EFECTIVO y FLOW (digital)
-    let totales = { EFECTIVO: 0, FLOW: 0 };
-
-    pagosSnap.forEach(doc => {
-      const p = doc.data();
-      console.log(`   - Pago: ${p.monto_pagado} (${p.medio_pago}) fecha: ${p.fecha_pago}`);
-      const monto = Number(p.monto_pagado);
-      if (p.medio_pago === 'EFECTIVO') {
-        totales.EFECTIVO += monto;
-      } else {
-        totales.FLOW += monto;
+    movsSnap.forEach(doc => {
+      const m = doc.data();
+      if (m.tipo === 'ENTRADA') {
+        saldo_teorico_cajon += m.monto;
+        entradas_efectivo += m.monto;
+      } else if (m.tipo === 'SALIDA') {
+        saldo_teorico_cajon -= m.monto;
+        salidas_efectivo += m.monto;
       }
     });
 
-    // Separar TOTAL (Banco + Caja)
-    const total_ingresos_arr = Object.values(totales).reduce((a, b) => a + b, 0);
+    // 2. Obtener Pagos Digitales (FLOW) para el reporte
+    const pagosSnap = await db.collection('pagos')
+      .where('fecha_pago', '>=', fechaApertura)
+      .where('fecha_pago', '<', fechaLimite)
+      .get();
 
-    // Calcular Saldo Teórico EN CAJÓN (Solo Efectivo)
-    const saldo_teorico_cajon = ultima.monto_inicial + totales.EFECTIVO;
-
-    // Calcular Saldo EN BANCO (todo lo digital = FLOW)
-    const saldo_banco = totales.FLOW;
+    let saldo_banco = 0;
+    pagosSnap.forEach(doc => {
+      const p = doc.data();
+      if (p.medio_pago !== 'EFECTIVO') {
+        saldo_banco += p.monto_pagado;
+      }
+    });
 
     res.json({
       caja_id: ultima.id,
       monto_inicial: ultima.monto_inicial,
-      ...totales, // Desglose por medio
-      total_ingresos: total_ingresos_arr,
-      saldo_teorico_cajon, // Esto es lo que debe haber físico
-      saldo_banco // Esto está en cuentas
+      EFECTIVO: saldo_teorico_cajon, // Esto es el saldo actual disponible
+      FLOW: saldo_banco,
+      entradas_efectivo,
+      salidas_efectivo,
+      saldo_teorico_cajon,
+      saldo_banco
     });
 
   } catch (err) {
