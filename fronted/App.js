@@ -158,13 +158,18 @@ function mostrarSeccion(id) {
     const pageTitle = document.getElementById('page-title');
     if (pageTitle) pageTitle.innerText = titles[id] || id;
 
-    // Actualizar fecha en header
+    // Actualizar fecha en header - SOLO VISIBLE EN CONFIGURACIÓN
     const headerDate = document.getElementById('header-date');
     if (headerDate) {
-        const hoy = obtenerFechaHoy();
-        headerDate.innerText = hoy.toLocaleDateString('es-PE', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-        });
+        if (id === 'config') {
+            headerDate.style.display = 'block';
+            const hoy = obtenerFechaHoy();
+            headerDate.innerText = hoy.toLocaleDateString('es-PE', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+        } else {
+            headerDate.style.display = 'none';
+        }
     }
 
     // Cargar datos si es necesario
