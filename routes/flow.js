@@ -51,8 +51,8 @@ router.post('/crear-pago', async (req, res) => {
             });
         }
 
-        const FRONTEND_URL = process.env.FRONTEND_URL;
-        const BACKEND_URL = process.env.BACKEND_URL;
+        const FRONTEND_URL = process.env.FRONTEND_URL || 'https://agile-prestamos-nn7p.onrender.com';
+        const BACKEND_URL = process.env.BACKEND_URL || 'https://agile-prestamos-nn7p.onrender.com';
 
         console.log(`🔵 Creando pago Flow para cuota ${cuota_id}, monto S/${monto}`);
 
