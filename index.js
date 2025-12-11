@@ -9,6 +9,13 @@ const prestamosRoutes = require('./routes/prestamos');
 const pagosRoutes = require('./routes/pagos');
 const cajaRoutes = require('./routes/caja');
 const flowRoutes = require('./routes/flow');
+const configRoutes = require('./routes/config');
+const { initDateHelper } = require('./utils/dateHelper');
+
+// Inicializar fecha simulada
+initDateHelper().then(() => {
+  console.log('🕒 Sistema de fecha inicializado.');
+});
 
 app.use(cors());
 app.use(express.json());
@@ -27,6 +34,7 @@ app.use('/prestamos', prestamosRoutes);
 app.use('/pagos', pagosRoutes);
 app.use('/caja', cajaRoutes);
 app.use('/flow', flowRoutes);
+app.use('/config', configRoutes);
 
 // Health check para Render
 app.get('/health', (req, res) => {
@@ -40,6 +48,9 @@ app.post('/', (req, res) => {
   const token = req.body.token || '';
   res.redirect(`/?pago=flow&token=${token}`);
 });
+
+// Servir archivos subidos (Declaraciones Juradas)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Servir archivos estáticos del frontend
 app.use(express.static(path.join(__dirname, 'fronted')));

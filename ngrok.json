@@ -1,0 +1,27 @@
+{"lvl":"info","msg":"no configuration paths supplied","t":"2025-12-10T10:15:35.3963219-05:00"}
+{"lvl":"info","msg":"using configuration at default config path","path":"C:\\Users\\Usuario\\AppData\\Local/ngrok/ngrok.yml","t":"2025-12-10T10:15:35.440495-05:00"}
+{"err":"\u003cnil\u003e","lvl":"info","msg":"open config file","path":"C:\\Users\\Usuario\\AppData\\Local\\ngrok\\ngrok.yml","t":"2025-12-10T10:15:35.440495-05:00"}
+{"addr":"127.0.0.1:4040","allow_hosts":null,"lvl":"info","msg":"starting web service","obj":"web","t":"2025-12-10T10:15:35.4650494-05:00"}
+{"lvl":"info","msg":"client session established","obj":"tunnels.session","t":"2025-12-10T10:15:36.0547808-05:00"}
+{"lvl":"info","msg":"tunnel session started","obj":"tunnels.session","t":"2025-12-10T10:15:36.0547808-05:00"}
+{"lvl":"info","msg":"update available","obj":"updater","t":"2025-12-10T10:15:36.0649996-05:00"}
+{"addr":"http://localhost:4000","lvl":"info","msg":"started tunnel","name":"command_line","obj":"tunnels","t":"2025-12-10T10:15:36.2678895-05:00","url":"https://5160253e5069.ngrok-free.app"}
+{"id":"6745b438b725","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:52314","t":"2025-12-10T10:16:55.8054048-05:00"}
+{"id":"9abe1704ad9f","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:52314","t":"2025-12-10T10:17:17.0181942-05:00"}
+{"id":"54f93eea478c","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:52314","t":"2025-12-10T10:17:28.3578427-05:00"}
+{"id":"1b0364c48d56","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"3.144.72.21:44162","t":"2025-12-10T10:17:34.6963375-05:00"}
+{"id":"4b8a274cc081","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:52314","t":"2025-12-10T10:17:41.4940732-05:00"}
+{"id":"2a24238ee93f","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"3.144.72.21:46820","t":"2025-12-10T10:20:58.582914-05:00"}
+{"id":"0aaf54e2a4fd","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2800:200:fdc0:3e1:4d8f:9be:65fb:8f8e]:63253","t":"2025-12-10T10:21:06.2110679-05:00"}
+{"id":"b8b49494e229","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2800:200:fdc0:3e1:4d8f:9be:65fb:8f8e]:63253","t":"2025-12-10T10:21:18.7328921-05:00"}
+{"id":"d37745b72466","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"3.144.72.21:47106","t":"2025-12-10T10:22:58.685089-05:00"}
+{"id":"0bef85a6be32","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:57885","t":"2025-12-10T10:23:06.3487024-05:00"}
+{"id":"eb6e75b97e5d","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"3.144.72.21:59926","t":"2025-12-10T11:14:46.7759388-05:00"}
+{"id":"62733f3d8465","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:57337","t":"2025-12-10T11:14:53.9199746-05:00"}
+{"id":"a7f8637e9e49","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"3.144.72.21:56152","t":"2025-12-10T11:22:49.7890119-05:00"}
+{"id":"b260b77719fb","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:60244","t":"2025-12-10T11:22:56.8585747-05:00"}
+{"id":"b0842cfabf1b","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:60244","t":"2025-12-10T11:23:16.2305897-05:00"}
+{"id":"3facba7e06f5","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"3.144.72.21:33890","t":"2025-12-10T11:29:48.4930958-05:00"}
+{"id":"ed79dfd93ccb","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:60738","t":"2025-12-10T11:29:55.5411733-05:00"}
+{"id":"2735880ddd22","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"3.144.72.21:59268","t":"2025-12-10T11:33:06.147433-05:00"}
+{"id":"3fd507afccb6","l":"[::1]:4000","lvl":"info","msg":"join connections","obj":"join","r":"[2001:1388:24af:d560:503e:39fb:7bff:eb5e]:60738","t":"2025-12-10T11:33:12.9604963-05:00"}

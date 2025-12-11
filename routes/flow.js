@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db/firebase');
+const { db } = require('../db/firebase');
 const { createPayment, getPaymentStatus } = require('../services/flowService');
 const {
     calcularEstadoCuota,
@@ -8,10 +8,31 @@ const {
     recalcularPrestamoDesdeCuotas,
     agregarPagoAHistorialPrestamo
 } = require('../services/pagosService');
+const { sendWhatsAppText, sendWhatsAppPdf } = require('../services/ultramsgService');
+const { getSystemDate } = require('../utils/dateHelper');
+
+
+// Helper: Verificar si la caja está abierta (Reutilizado de pagos.js)
+async function cajaAbiertaHoy() {
+    const snapshot = await db.collection('cierre_caja')
+        .orderBy('fecha', 'desc')
+        .limit(1)
+        .get();
+
+    if (snapshot.empty) return false;
+    const caja = snapshot.docs[0].data();
+    return caja.cerrado === false;
+}
 
 // POST /flow/crear-pago
 router.post('/crear-pago', async (req, res) => {
     try {
+        // 1. Validar Caja Abierta (Regla de Negocio)
+        const abierta = await cajaAbiertaHoy();
+        if (!abierta) {
+            return res.status(400).json({ error: 'La caja está cerrada. Debe abrir caja para procesar pagos (incluso digitales).' });
+        }
+
         const { cuota_id, monto, cliente_nombre, cliente_email } = req.body;
 
         if (!cuota_id || !monto) {
@@ -30,33 +51,74 @@ router.post('/crear-pago', async (req, res) => {
             });
         }
 
-        const FRONTEND_URL = process.env.FRONTEND_URL || 'https://agile-prestamos-nn7p.onrender.com';
-        const BACKEND_URL = "https://agile-prestamos-nn7p.onrender.com";
+        const FRONTEND_URL = process.env.FRONTEND_URL;
+        const BACKEND_URL = process.env.BACKEND_URL;
 
         console.log(`🔵 Creando pago Flow para cuota ${cuota_id}, monto S/${monto}`);
 
+        // Generar Order ID único para permitir pagos parciales múltiples sobre la misma cuota
+        const uniqueCommerceOrder = `${cuota_id}_${Date.now()}`;
+
         // Crear pago en Flow
         const flowData = await createPayment({
-            commerceOrder: cuota_id,
+            commerceOrder: uniqueCommerceOrder,
             subject: `Pago de cuota - ${cliente_nombre || 'Cliente'}`,
             amount: monto,
             email: cliente_email,
             urlConfirmation: `${BACKEND_URL}/flow/webhook`,
-            urlReturn: `${FRONTEND_URL}?pago=flow&cuota_id=${cuota_id}`
+            // En el retorno seguimos enviando el cuota_id limpio para que el frontend lo entienda
+            urlReturn: `${BACKEND_URL}/flow/retorno?cuota_id=${cuota_id}`
         });
 
+        // Obtener datos del préstamo y cliente para enviar el mensaje
+        const cuotaRef = db.collection('cuotas').doc(cuota_id);
+        const cuotaSnap = await cuotaRef.get();
+        if (!cuotaSnap.exists) throw new Error("Cuota no encontrada");
+        const cuotaData = cuotaSnap.data();
+
+        const prestamoRef = db.collection('prestamos').doc(cuotaData.prestamo_id);
+        const prestamoSnap = await prestamoRef.get();
+        const prestamoData = prestamoSnap.data();
+
+        // Obtener teléfono del cliente
+        let clienteTelefono = '';
+        if (prestamoData.cliente_id) {
+            const clienteSnap = await db.collection('clientes').doc(prestamoData.cliente_id).get();
+            if (clienteSnap.exists) {
+                clienteTelefono = clienteSnap.data().telefono;
+            }
+        }
+
+        const linkPago = flowData.url + '?token=' + flowData.token;
+
+        // Enviar enlace por WhatsApp si hay teléfono
+        if (clienteTelefono) {
+            const msg = `Hola ${cliente_nombre},
+
+Detalle de tu deuda:
+Cuota N°: ${cuotaData.numero_cuota}
+Monto: S/ ${monto}
+
+Realiza tu pago de forma segura aquí:
+${linkPago}`;
+
+            console.log(`📱 Enviando enlace de pago a ${clienteTelefono}`);
+            await sendWhatsAppText(clienteTelefono, msg);
+        }
+
+        // Responder al frontend indicando que se envió el mensaje
         res.json({
-            url: flowData.url + '?token=' + flowData.token,
-            token: flowData.token,
-            flowOrder: flowData.flowOrder
+            success: true,
+            mensaje: 'Enlace de pago enviado por WhatsApp al cliente',
+            link: linkPago, // Por si acaso el admin lo quiere
+            whatsapp_sent: !!clienteTelefono
         });
 
     } catch (err) {
         console.error('❌ Error creando pago Flow:', err);
-
-        // Error 1605: El pago ya fue realizado en Flow
+        // ... (resto del catch se mantiene igual, aunque ahora será menos probable el error 1605)
         if (err.message && err.message.includes('previously paid')) {
-            // Verificar si la cuota ya está marcada como pagada en nuestra BD
+            // ... lógica existente ...
             const cuotaRef = db.collection('cuotas').doc(req.body.cuota_id);
             const cuotaSnap = await cuotaRef.get();
 
@@ -66,16 +128,138 @@ router.post('/crear-pago', async (req, res) => {
                     yaPageda: true
                 });
             } else {
-                // El pago existe en Flow pero no en nuestra BD - informar al usuario
                 return res.status(400).json({
-                    error: 'Este pago ya fue procesado en Flow. Si no ves el pago reflejado, contacta al administrador.',
+                    error: 'Este pago ya fue procesado en Flow. Intente nuevamente en unos segundos.', // Mensaje ajustado
                     requiereVerificacion: true,
                     cuota_id: req.body.cuota_id
                 });
             }
         }
-
         res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /flow/retorno
+// Recibe el POST del navegador del usuario desde Flow y redirige a la página de éxito
+router.post('/retorno', async (req, res) => {
+    const token = req.body.token;
+    const cuota_id = req.query.cuota_id;
+
+    console.log(`📩 Cliente retornó de Flow. Token: ${token}, Cuota: ${cuota_id}`);
+
+    try {
+        // Obtener datos para la boleta
+        let clienteNombre = 'Cliente';
+        let clienteDni = '---';
+        let clienteDireccion = 'Av. Desconocida';
+        let monto = '0.00';
+        let cuotaNumero = '1';
+
+        // 1. Obtener monto real pagado desde Flow
+        try {
+            console.log(`🔍 Verificando monto real en Flow para token: ${token}...`);
+            const flowStatus = await getPaymentStatus(token);
+            if (flowStatus && flowStatus.amount) {
+                monto = parseFloat(flowStatus.amount).toFixed(2);
+                console.log(`✅ Monto real obtenido de Flow: S/ ${monto}`);
+
+                // --- ROBUSTEZ: Si el Webhook falló, procesamos aquí mismo ---
+                if (flowStatus.status === 2) {
+                    console.log('🔄 Estado Flow APROBADO (2). Verificando si ya se procesó en BD...');
+                    // procesarPagoAprobado maneja idempotencia (chequea duplicados internamente)
+                    await procesarPagoAprobado(flowStatus, token);
+                }
+            }
+        } catch (flowError) {
+            console.error("⚠️ Error consultando monto a Flow:", flowError.message);
+        }
+
+        if (cuota_id) {
+            const cuotaSnap = await db.collection('cuotas').doc(cuota_id).get();
+            if (cuotaSnap.exists) {
+                const cuotaData = cuotaSnap.data();
+
+                // Si por alguna razón falló Flow, usamos el monto de la cuota (fallback)
+                if (monto === '0.00') {
+                    monto = parseFloat(cuotaData.monto_cuota || 0).toFixed(2);
+                }
+
+                cuotaNumero = cuotaData.numero_cuota || '1';
+
+                if (cuotaData.prestamo_id) {
+                    const prestamoSnap = await db.collection('prestamos').doc(cuotaData.prestamo_id).get();
+                    if (prestamoSnap.exists) {
+                        const prestamoData = prestamoSnap.data();
+
+                        if (prestamoData.cliente_id) {
+                            const clienteSnap = await db.collection('clientes').doc(prestamoData.cliente_id).get();
+                            if (clienteSnap.exists) {
+                                const clienteData = clienteSnap.data();
+                                clienteNombre = clienteData.nombre || 'Cliente';
+                                clienteDni = clienteData.documento || '---';
+                                clienteDireccion = clienteData.direccion || 'Av. Siempre Viva 123';
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Polling para esperar la generación del PDF (Máx 7 segundos)
+        let pdfUrl = null;
+        let intentos = 0;
+        const maxIntentos = 14; // 14 * 500ms = 7 seg
+
+        while (intentos < maxIntentos) {
+            try {
+                const pagosSnap = await db.collection('pagos')
+                    .where('flow_token', '==', token)
+                    .limit(1)
+                    .get();
+
+                if (!pagosSnap.empty) {
+                    const pagoData = pagosSnap.docs[0].data();
+                    if (pagoData.comprobante_url) {
+                        pdfUrl = pagoData.comprobante_url;
+                        break;
+                    }
+                }
+            } catch (e) {
+                console.error("Error buscando PDF:", e);
+            }
+
+            intentos++;
+            await new Promise(r => setTimeout(r, 500)); // Esperar 500ms
+            console.log(`⏳ Esperando PDF... Intento ${intentos}`);
+        }
+
+        if (pdfUrl) {
+            // REDIRECT DIRECTO AL PDF (Requisito Usuario)
+            console.log(`🚀 Redirigiendo directo al PDF: ${pdfUrl}`);
+            return res.redirect(pdfUrl);
+        }
+
+        // Fallback si falla la generación (o timeout)
+        // Mostrar un error simple o intentar la página de éxito como último recurso (aunque el usuario dijo que no)
+        // Para ser fiel a "no pase por el pago exitoso", podriamos mostrar un HTML simple que recargue
+        res.send(`
+        <html>
+            <head>
+                <meta http-equiv="refresh" content="2">
+                <style>body { font-family: sans-serif; text-align: center; padding-top: 50px; }</style>
+            </head>
+            <body>
+                <h2>Generando su comprobante...</h2>
+                <p>Por favor espere, estamos finalizando su documento.</p>
+                <div class="loader" style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto;"></div>
+                <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+            </body>
+        </html>
+    `);
+
+    } catch (error) {
+        console.error("Error crítico en retorno:", error);
+        res.status(500).send("Error procesando su solicitud. Por favor contacte soporte.");
     }
 });
 
@@ -84,10 +268,12 @@ router.post('/crear-pago', async (req, res) => {
  * Reutilizable por webhook y verificación manual
  */
 async function procesarPagoAprobado(paymentData, token) {
-    const cuota_id = paymentData.commerceOrder;
+    // Extraer cuota_id real (por si viene con sufijo _timestamp)
+    const rawOrder = paymentData.commerceOrder || '';
+    const cuota_id = rawOrder.split('_')[0];
     const monto_pagado = Number(paymentData.amount);
 
-    console.log(`?o. Procesando pago para cuota ${cuota_id}, monto S/${monto_pagado}`);
+    console.log(`?o. Procesando pago para cuota ${cuota_id} (Order: ${rawOrder}), monto S/${monto_pagado}`);
 
     // Obtener cuota
     const cuotaRef = db.collection('cuotas').doc(cuota_id);
@@ -133,7 +319,7 @@ async function procesarPagoAprobado(paymentData, token) {
     batch.set(pagoRef, {
         cuota_id: cuota_id,
         prestamo_id: cuota.prestamo_id,
-        fecha_pago: new Date().toISOString(),
+        fecha_pago: getSystemDate().toISOString(),
         monto_pagado: monto_pagado,
         monto_recibido: monto_pagado,
         medio_pago: 'FLOW',
@@ -151,7 +337,7 @@ async function procesarPagoAprobado(paymentData, token) {
     batch.update(cuotaRef, {
         saldo_pendiente: nuevoSaldo,
         pagada: pagada,
-        ultima_fecha_pago: new Date().toISOString()
+        ultima_fecha_pago: getSystemDate().toISOString()
     });
 
     // 3. Ejecutar cambios en BD
@@ -166,51 +352,92 @@ async function procesarPagoAprobado(paymentData, token) {
         medio: 'FLOW',
         flow_token: token,
         flow_order: paymentData.flowOrder,
-        fecha: new Date().toISOString()
+        fecha: getSystemDate().toISOString()
     });
-
-    // 4. Generar comprobante
-    try {
-        const prestamoSnap = await db.collection('prestamos').doc(cuota.prestamo_id).get();
-        let clienteDoc = '00000000';
-        let clienteNombre = 'Cliente Flow';
-
-        if (prestamoSnap.exists) {
-            const pid = prestamoSnap.data().cliente_id;
-            const cSnap = await db.collection('clientes').doc(pid).get();
-            if (cSnap.exists) {
-                clienteDoc = cSnap.data().documento;
-                clienteNombre = cSnap.data().nombre;
-            }
-        }
-
-        await db.collection('comprobantes').add({
-            pago_id: pagoRef.id,
-            cuota_id,
-            cliente_nombre: clienteNombre,
-            cliente_documento: clienteDoc,
-            cliente_email: paymentData.payer,
-            numero_cuota: cuota.numero_cuota,
-            fecha_emision: new Date().toISOString(),
-            monto_total: monto_pagado,
-            desglose: { capital: abonoCapital, mora: abonoMora },
-            medio_pago: 'FLOW',
-            serie: clienteDoc.length === 11 ? 'F001' : 'B001',
-            tipo: clienteDoc.length === 11 ? 'FACTURA' : 'BOLETA'
-        });
-        console.log('?Y"" Comprobante generado');
-    } catch (errReceipt) {
-        console.error('?s???? Error generando comprobante:', errReceipt.message);
-    }
 
     // 5. Recalcular estado del préstamo (saldo, pagado/parcial)
     const resumenPrestamo = await recalcularPrestamoDesdeCuotas(db, cuota.prestamo_id, cuota_id);
-    if (resumenPrestamo.cancelado) {
-        console.log(`?YZ% PR?%STAMO ${cuota.prestamo_id} COMPLETADO`);
-    } else {
-        console.log(`?Y" Prestamo ${cuota.prestamo_id} pendiente. Saldo S/${resumenPrestamo.saldoRestante}`);
-    }
 
+    // --- NUEVO: GENERAR PDF EN BACKEND PARA FLOW (Async) ---
+    // No esperamos el PDF para confirmar a Flow (rapidez del webhook), pero lo lanzamos
+    (async () => {
+        console.log('🚀 Iniciando proceso post-pago background (PDF + WhatsApp)...');
+        try {
+            const prestamoSnap = await db.collection('prestamos').doc(cuota.prestamo_id).get();
+            const prestamoData = prestamoSnap.exists ? prestamoSnap.data() : {};
+
+            // Obtener datos reales del cliente
+            let realClienteNombre = prestamoData.cliente_nombre || 'Cliente Remoto';
+            let realClienteDoc = prestamoData.cliente_documento || '-';
+            let realDireccion = 'Inambari'; // Valor por defecto o del cliente
+
+            let clienteTelefono = '';
+
+            if (prestamoData.cliente_id) {
+                const clienteSnap = await db.collection('clientes').doc(prestamoData.cliente_id).get();
+                if (clienteSnap.exists) {
+                    const cData = clienteSnap.data();
+                    realClienteNombre = cData.nombre || realClienteNombre;
+                    realClienteDoc = cData.documento || realClienteDoc;
+                    realDireccion = cData.direccion || realDireccion;
+                    clienteTelefono = cData.telefono || '';
+                }
+            }
+
+            const pdfData = {
+                numero_serie: 'B001',
+                numero_comprobante: pagoRef.id.substring(0, 8).toUpperCase(),
+                cliente_nombre: realClienteNombre,
+                cliente_doc: realClienteDoc,
+                direccion: realDireccion,
+                numero_cuota: cuota.numero_cuota,
+                monto_total: monto_pagado,
+                mora: abonoMora,
+                medio_pago: 'FLOW'
+            };
+
+            const { generarReciboPDF } = require('../services/pdfService');
+            const pdfUrl = await generarReciboPDF(pdfData);
+
+            await pagoRef.update({ comprobante_url: pdfUrl });
+            console.log(`📜 PDF generado para Flow: ${pdfUrl}`);
+
+            console.log(`🔎 Verificando teléfono para WhatsApp. ClienteID: ${prestamoData.cliente_id}, Tel: ${clienteTelefono}`);
+
+            // --- INTEGRACION ULTRAMSG (WHATSAPP) ---
+            if (clienteTelefono) {
+                try {
+                    console.log(`📱 Iniciando envío WhatsApp a ${clienteTelefono}...`);
+
+                    // 1. Construir caption formal
+                    const now = new Date();
+                    const fechaStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+                    const boletaNum = `B001-${pagoRef.id.substring(0, 8).toUpperCase()}`;
+
+                    const caption = `📄 *Comprobante de Pago*
+
+Boleta: ${boletaNum}
+Monto: S/ ${monto_pagado.toFixed(2)}
+Fecha: ${fechaStr}
+
+Gracias por tu pago.`;
+
+                    // 2. Enviar UN solo mensaje (PDF + Caption)
+                    await sendWhatsAppPdf(clienteTelefono, pdfUrl, `Comprobante_${boletaNum}.pdf`, caption);
+
+                } catch (waError) {
+                    console.error('⚠️ Error enviando WhatsApp (UltraMSG):', waError.message);
+                }
+            } else {
+                console.log('⚠️ No se envió WhatsApp porque el cliente no tiene teléfono registrado.');
+            }
+
+        } catch (e) {
+            console.error("Error generando PDF Flow:", e);
+        }
+    })();
+
+    // 6. Retornar resultado
     return {
         success: true,
         pago_id: pagoRef.id,
@@ -224,6 +451,8 @@ async function procesarPagoAprobado(paymentData, token) {
         saldo_prestamo: resumenPrestamo.saldoRestante
     };
 }
+
+
 
 // POST /flow/webhook - Webhook de Flow
 router.post('/webhook', async (req, res) => {

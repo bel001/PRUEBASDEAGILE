@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprobante de Pago - Agile Préstamos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary: #0056b3;
+            /* Blue */
+            --accent: #00d2d3;
+            /* Cyan/Greenish */
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+            --border: #e9ecef;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #eef2f7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: var(--dark);
+        }
+
+        /* --- VISTA EN PANTALLA --- */
+        .success-card {
+            display: none;
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+            border-top: 5px solid var(--accent);
+        }
+
+        .brand-logo-screen {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: var(--dark);
+            display: inline-block;
+        }
+
+        .brand-logo-screen span {
+            color: var(--accent);
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #d4edda;
+            color: #155724;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 20px;
+        }
+
+        h1 {
+            margin: 10px 0;
+            font-size: 24px;
+            color: var(--dark);
+        }
+
+        p {
+            color: #6c757d;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, var(--primary), #007bff);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 86, 179, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 86, 179, 0.4);
+        }
+
+        /* --- ESTILOS DE IMPRESIÓN (BOLETA) --- */
+        #boleta-print {
+            display: block;
+            /* Mostrar siempre para que html2pdf lo capture */
+            /* Oculto en pantalla */
+            width: 100%;
+            max-width: 800px;
+            background: white;
+            padding: 40px;
+            box-sizing: border-box;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .header-print {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 20px;
+        }
+
+        .logo-print {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo-text {
+            font-size: 32px;
+            font-weight: 800;
+            color: #032b57;
+            letter-spacing: -1px;
+            font-style: italic;
+        }
+
+        .logo-text span {
+            color: #00d2d3;
+        }
+
+        .company-details {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #555;
+            line-height: 1.4;
+        }
+
+        .ruc-box {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px 25px;
+            text-align: center;
+            background: #fcfcfc;
+            min-width: 200px;
+        }
+
+        .ruc-number {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .doc-type {
+            display: block;
+            font-size: 16px;
+            font-weight: 900;
+            background: var(--primary);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+
+        .doc-number {
+            font-size: 14px;
+            color: #555;
+            display: block;
+            margin-top: 5px;
+        }
+
+        .client-section {
+            background-color: #f8f9fa;
+            border-left: 4px solid var(--accent);
+            padding: 20px;
+            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            font-size: 13px;
+        }
+
+        .client-row {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .label {
+            color: #888;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 10px;
+            margin-bottom: 3px;
+        }
+
+        .value {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        .items-table th {
+            text-align: left;
+            padding: 12px;
+            background-color: #f1f2f6;
+            color: #57606f;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .items-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #eee;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .totals-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 40px;
+        }
+
+        .totals-box {
+            width: 250px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .grand-total {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary);
+            border-top: 2px solid #eee;
+            padding-top: 15px;
+            margin-top: 10px;
+        }
+
+        .footer-print {
+            text-align: center;
+            font-size: 11px;
+            color: #999;
+            margin-top: 50px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        /* --- PRINT MEDIA QUERY --- */
+        @media print {
+            body {
+                background: white;
+                margin: 0;
+                padding: 0;
+                font-family: 'Helvetica Neue', Arial, sans-serif;
+            }
+
+            .success-card {
+                display: none !important;
+            }
+
+            #boleta-print {
+                display: block !important;
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+                box-shadow: none;
+            }
+
+            @page {
+                margin: 1cm;
+                size: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Pantalla de Éxito -->
+    <div class="success-card">
+        <div class="brand-logo-screen">agile<span>-prestamos</span></div>
+        <div class="success-icon">✓</div>
+        <h1>¡Pago Realizado!</h1>
+        <p>Gracias por tu cumplimiento. Hemos registrado tu cuota correctamente.</p>
+
+        <button class="btn-download" onclick="window.print()">
+            📥 Descargar Constancia
+        </button>
+    </div>
+
+    <!-- Diseño de la Boleta para Impresión -->
+    <div id="boleta-print">
+        <div class="header-print">
+            <div class="logo-print">
+                <div class="logo-text">agile<span>-prestamos</span></div>
+                <div class="company-details">
+                    AGILE PRESTAMOS S.A.C.<br>
+                    Av. Siempreviva 123, Of 402<br>
+                    Trujillo, La Libertad<br>
+                    contacto@agileprestamos.com
+                </div>
+            </div>
+            <div class="ruc-box">
+                <span class="ruc-number">R.U.C. 20609998877</span>
+                <span class="doc-type">BOLETA ELECTRÓNICA</span>
+                <span class="doc-number" id="b-numero">EB01-00003421</span>
+            </div>
+        </div>
+
+        <div class="client-section">
+            <div class="client-row">
+                <span class="label">Cliente</span>
+                <span class="value" id="b-cliente">CLIENTE GENERAL</span>
+            </div>
+            <div class="client-row">
+                <span class="label">Doc. Identidad</span>
+                <span class="value" id="b-dni">00000000</span>
+            </div>
+            <div class="client-row" style="margin-top:10px;">
+                <span class="label">Dirección</span>
+                <span class="value" id="b-direccion">-</span>
+            </div>
+            <div class="client-row" style="margin-top:10px;">
+                <span class="label">Fecha de Emisión</span>
+                <span class="value" id="b-fecha">10/12/2025</span>
+            </div>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">Cant.</th>
+                    <th style="width: 15%;">U.M.</th>
+                    <th style="width: 50%;">Descripción</th>
+                    <th class="text-right">V. Unitario</th>
+                    <th class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>ZZ</td>
+                    <td>
+                        <strong>CUOTA DE PRÉSTAMO N° <span id="b-cuota">1</span></strong><br>
+                        <span style="font-size: 11px; color: #777;">Pago efectuado vía Flow (Pasarela Digital)</span>
+                    </td>
+                    <td class="text-right" id="b-precio">0.00</td>
+                    <td class="text-right" id="b-importe">0.00</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="totals-section">
+            <div class="totals-box">
+                <div class="total-row">
+                    <span>Op. Gravada:</span>
+                    <span>S/ 0.00</span>
+                </div>
+                <div class="total-row">
+                    <span>Op. Exonerada:</span>
+                    <span id="b-subtotal">S/ 0.00</span>
+                </div>
+                <div class="total-row">
+                    <span>I.G.V.:</span>
+                    <span>S/ 0.00</span>
+                </div>
+                <div class="total-row grand-total">
+                    <span>IMPORTE TOTAL:</span>
+                    <span id="b-total">S/ 0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-print">
+            Representación Impresa de la Boleta de Venta Electrónica<br>
+            Autorizado mediante Resolución de Intendencia N° 034-005-00123/SUNAT<br>
+            Gracias por su preferencia.
+        </div>
+    </div>
+
+    <script>
+        // Lógica simple para poblar datos desde URL
+        const p = new URLSearchParams(window.location.search);
+
+        function t(id, val) {
+            const e = document.getElementById(id);
+            if (e) e.textContent = val || '-';
+        }
+
+        const monto = parseFloat(p.get('amount') || 0).toFixed(2);
+
+        t('b-cliente', p.get('name'));
+        t('b-dni', p.get('dni'));
+        t('b-direccion', p.get('address'));
+        t('b-fecha', p.get('date'));
+        t('b-cuota', p.get('num_cuota'));
+        t('b-precio', monto);
+        t('b-importe', monto);
+        t('b-subtotal', 'S/ ' + monto);
+        t('b-total', 'S/ ' + monto);
+
+        // Generar correlativo random
+        const rnd = Math.floor(1000 + Math.random() * 9000);
+        t('b-numero', 'EB01-0000' + rnd);
+
+        // Auto-descargar PDF al cargar
+        window.onload = function () {
+            // Si hay URL de PDF del backend, redirigir
+            const pdfUrl = p.get('pdf');
+            if (pdfUrl && pdfUrl !== 'undefined' && pdfUrl !== 'null') {
+                window.location.href = pdfUrl;
+                return;
+            }
+
+            // Fallback: Mostrar la boleta en HTML pero NO descargar automáticamente
+            document.querySelector('.success-card').style.display = 'none';
+            document.getElementById('boleta-print').style.display = 'block';
+
+            // Opcional: Podríamos intentar generar el PDF en Blob y abrirlo, 
+            // pero el usuario pidió explícitamente el PDF de la BD.
+            // Si no llegó el de la BD, mostramos el HTML que se ve igual.
+        };
+    </script>
+</body>
+
+</html>

@@ -19,16 +19,16 @@
         <div class="login-card">
             <h1>🏦 AGILE Préstamos</h1>
             <h3>Sistema de Cobranzas</h3>
-            <p style="color: #7f8c8d; margin-bottom: 30px;">Inicio de Sesión - Cajero</p>
+            <p style="color: #7f8c8d; margin-bottom: 30px;">Inicio de Sesión</p>
 
             <div class="form-group">
                 <label>Usuario:</label>
-                <input type="text" id="login-usuario" placeholder="Ingrese su usuario" value="cajero">
+                <input type="text" id="login-usuario" placeholder="Ingrese su usuario">
             </div>
 
             <div class="form-group">
                 <label>Contraseña:</label>
-                <input type="password" id="login-password" placeholder="Ingrese su contraseña" value="123">
+                <input type="password" id="login-password" placeholder="Ingrese su contraseña">
             </div>
 
             <div id="login-mensaje" style="color: #e74c3c; text-align: center; margin: 10px 0;"></div>
@@ -36,10 +36,6 @@
             <button class="btn-secondary" style="width: 100%; padding: 12px;" onclick="iniciarSesion()">
                 🔐 Iniciar Sesión
             </button>
-
-            <small style="display: block; text-align: center; margin-top: 15px; color: #95a5a6;">
-                Usuario demo: <strong>cajero</strong> / Contraseña: <strong>123</strong>
-            </small>
         </div>
     </div>
 
@@ -49,15 +45,11 @@
         <!-- SIDEBAR -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2>💰 CAPITAL RISE</h2>
-                <span>LOANS</span>
+                <img src="logo.png" alt="Agile Prestamos" style="width: 100%; max-width: 150px; margin-bottom: 10px;">
+                <h2 style="font-size: 1.2em;">AGILE-PRESTAMOS</h2>
             </div>
 
             <nav class="sidebar-nav">
-                <button class="nav-item active" onclick="mostrarSeccion('dashboard')">
-                    <span class="nav-icon">📊</span>
-                    <span>Dashboard</span>
-                </button>
                 <button class="nav-item" onclick="mostrarSeccion('clientes')">
                     <span class="nav-icon">👥</span>
                     <span>Clientes</span>
@@ -74,16 +66,8 @@
                     <span class="nav-icon">🏦</span>
                     <span>Caja</span>
                 </button>
-                <button class="nav-item" onclick="mostrarSeccion('calendario')">
-                    <span class="nav-icon">📅</span>
-                    <span>Calendario</span>
-                </button>
-                <button class="nav-item btn-admin" onclick="mostrarSeccion('empleados')">
-                    <span class="nav-icon">👤</span>
-                    <span>Empleados</span>
-                </button>
                 <button class="nav-item btn-admin" onclick="mostrarSeccion('config')">
-                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-icon">⚙</span>
                     <span>Configuración</span>
                 </button>
             </nav>
@@ -111,64 +95,11 @@
                 </div>
             </div>
 
-            <!-- SECCIÓN DASHBOARD (NUEVA) -->
-            <div id="seccion-dashboard" class="seccion" style="display: block;">
-                <!-- Estadísticas -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">👥</div>
-                        <div class="stat-value" id="stat-clientes">0</div>
-                        <div class="stat-label">Clientes Registrados</div>
-                    </div>
-                    <div class="stat-card success">
-                        <div class="stat-icon">💵</div>
-                        <div class="stat-value" id="stat-prestamos">0</div>
-                        <div class="stat-label">Préstamos Activos</div>
-                    </div>
-                    <div class="stat-card accent">
-                        <div class="stat-icon">💰</div>
-                        <div class="stat-value" id="stat-cobrado">S/ 0</div>
-                        <div class="stat-label">Cobrado Hoy</div>
-                    </div>
-                    <div class="stat-card danger">
-                        <div class="stat-icon">⚠️</div>
-                        <div class="stat-value" id="stat-morosos">0</div>
-                        <div class="stat-label">Clientes Morosos</div>
-                    </div>
-                </div>
-
-                <!-- Alertas de cuotas vencidas -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3>⚠️ Cuotas Vencidas Hoy</h3>
-                        <button class="btn-small" onclick="mostrarSeccion('pagos')">Ver Todas</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="lista-cuotas-vencidas">
-                            <p style="text-align: center; color: var(--text-muted);">Cargando...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Accesos rápidos -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3>🚀 Acciones Rápidas</h3>
-                    </div>
-                    <div class="card-body" style="display: flex; gap: 15px; flex-wrap: wrap;">
-                        <button class="btn-primary" onclick="mostrarSeccion('clientes')">➕ Nuevo Cliente</button>
-                        <button class="btn-secondary" onclick="mostrarSeccion('prestamos')">💵 Nuevo Préstamo</button>
-                        <button class="btn-small" onclick="mostrarSeccion('pagos')">💳 Registrar Pago</button>
-                    </div>
-                </div>
-            </div>
-
             <!-- SECCIÓN CLIENTES -->
             <div id="seccion-clientes" class="seccion">
-
                 <!-- Estadísticas de Filtro (Oculto por defecto) -->
                 <div id="stats-morosos" class="filter-stats" style="display: none;">
-                    <span>⚠️ Mostrando solo clientes con cuotas vencidas</span>
+                    <span>⚠ Mostrando solo clientes con cuotas vencidas</span>
                     <span id="total-mora-acumulada">Total Mora: S/ 0.00</span>
                 </div>
 
@@ -199,6 +130,48 @@
                                     <span id="doc-validacion" class="validation-icon"></span>
                                 </div>
                                 <small id="doc-mensaje">DNI debe tener exactamente 8 dígitos.</small>
+                            </div>
+                        </div>
+
+                        <!-- Check Persona Jurídica -->
+                        <div class="form-group" style="margin-top: 10px; margin-bottom: 5px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="check-juridica" onchange="toggleJuridica()"
+                                    style="width: 18px; height: 18px; cursor: pointer;">
+                                <label for="check-juridica"
+                                    style="margin: 0; cursor: pointer; font-weight: bold; color: var(--dark);">
+                                    Es Persona Jurídica / Ente Jurídico
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Sección Declaración Jurada (Oculta) -->
+                        <div id="seccion-juridica"
+                            style="display: none; background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 5px solid #ffc107; margin-top: 5px; margin-bottom: 15px;">
+                            <h4 style="margin: 0 0 10px 0; color: #856404; font-size: 16px;">⚠ Requisito para Personas
+                                Jurídicas</h4>
+
+                            <div class="form-group">
+                                <label style="font-weight: bold; display: block; margin-bottom: 5px;">1. Descargar
+                                    Plantilla:</label>
+                                <!-- Plantilla en Nube (Firebase Storage) -->
+                                <a id="link-plantilla-dj"
+                                    href="https://firebasestorage.googleapis.com/v0/b/agile-prestamos.firebasestorage.app/o/plantillas%2FMODELO_DECLARACION_JURADA.pdf?alt=media&token=b3f7db6c-d060-44ba-9952-6cd043b32456"
+                                    target="_blank" class="btn-small"
+                                    style="background: #e74c3c; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; color: white; padding: 8px 15px; border-radius: 5px;">
+                                    📄 Ver Modelo de Declaración Jurada
+                                </a>
+                                <small style="display: block; margin-top: 5px; color: #666;">Descargue este formato,
+                                    fírmelo y luego súbalo en la opción de abajo.</small>
+                            </div>
+
+                            <hr style="border: 0; border-top: 1px solid #e0d0a0; margin: 15px 0;">
+
+                            <div class="form-group">
+                                <label style="font-weight: bold;">2. Subir Declaración Jurada Firmada:</label>
+                                <input type="file" id="archivo-dj" accept=".pdf"
+                                    style="background: white; padding: 10px; border-radius: 5px; width: 100%;">
+                                <small>Solo se permiten archivos PDF.</small>
                             </div>
                         </div>
 
@@ -247,7 +220,7 @@
                     <div class="card-header">
                         <h3>📋 Listado de Clientes</h3>
                         <button id="btn-filtro-morosos" class="btn-filter" onclick="toggleFiltroMorosos()">
-                            ⚠️ Ver Solo Morosos
+                            ⚠ Ver Solo Morosos
                         </button>
                         <button class="btn-small" onclick="cargarClientes()" style="margin-left: 10px;">🔄
                             Actualizar</button>
@@ -261,6 +234,7 @@
                                     <th>Documento</th>
                                     <th>Nombre / Razón Social</th>
                                     <th>Tipo</th>
+                                    <th>Condición</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -294,9 +268,24 @@
 
                         <div id="form-prestamo" style="display:none;">
                             <div class="form-group">
-                                <label>Monto Total del Préstamo:</label>
-                                <input type="number" id="monto-prestamo" placeholder="Ej: 5000" step="0.01" max="20000">
+                                <label>Monto del Préstamo (Capital):</label>
+                                <input type="number" id="monto-capital" placeholder="Ej: 1000" step="0.01" max="20000">
                                 <small>Máximo: S/ 20,000</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Fecha de Inicio:</label>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="date" id="fecha-inicio-prestamo" style="flex: 1;">
+                                    <button class="btn-small" onclick="setFechaHoyPrestamo()" type="button">📅
+                                        Hoy</button>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>TEA (%):</label>
+                                <input type="number" id="tea-prestamo" placeholder="Ej: 85.5" step="0.01">
+                                <small>Tasa Efectiva Anual</small>
                             </div>
 
                             <div class="form-group">
@@ -327,8 +316,11 @@
                                 <tr>
                                     <th>#</th>
                                     <th>Vencimiento</th>
-                                    <th>Monto</th>
-                                    <th>Saldo</th>
+                                    <th>Saldo Capital</th>
+                                    <th>Amortización</th>
+                                    <th>Interés</th>
+                                    <th>Cuota</th>
+                                    <th>Deuda Cuota</th>
                                     <th>Estado</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -381,7 +373,7 @@
                         <!-- Resumen dinámico -->
                     </div>
 
-                    <table class="tabla-clientes" id="tabla-estado-cuenta">
+                    <table class="tabla-clientes" id="tabla-estado-cuenta" style="display:none;">
                         <thead>
                             <tr>
                                 <th>Fecha</th>
@@ -396,8 +388,48 @@
                         </tbody>
                     </table>
 
+                    <div style="margin-top: 30px; border-top: 2px solid #3498db; padding-top: 10px;">
+                        <h4 style="color: #2c3e50;">📜 Historial de Transacciones (Detallado)</h4>
+                        <table class="tabla-clientes">
+                            <thead>
+                                <tr style="background: #e1f5fe;">
+                                    <th>Fecha Pago</th>
+                                    <th>Cuota Asoc.</th>
+                                    <th>Monto Pagado</th>
+                                    <th>Medio</th>
+                                    <th>Recibo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="estado-cuenta-pagos-lista">
+                                <!-- Pagos parciales y totales aquí -->
+                            </tbody>
+                        </table>
+                    </div>
+
                     <div style="text-align: right; margin-top: 15px;">
                         <button class="btn-secondary" onclick="cerrarEstadoCuenta()">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL DETALLE CLIENTE (NUEVO) -->
+            <div id="modal-detalle-cliente"
+                style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+                <div
+                    style="background: white; width: 90%; max-width: 500px; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                        <h3 style="margin: 0; color: #2c3e50;">👤 Datos del Cliente</h3>
+                        <button onclick="cerrarModalCliente()"
+                            style="background: none; border: none; font-size: 1.5em; cursor: pointer; color: #7f8c8d;">✕</button>
+                    </div>
+
+                    <div id="detalle-cliente-contenido" style="font-size: 1.05em; line-height: 1.6;">
+                        <!-- Contenido dinámico -->
+                    </div>
+
+                    <div style="text-align: right; margin-top: 25px;">
+                        <button class="btn-primary" onclick="cerrarModalCliente()">Cerrar</button>
                     </div>
                 </div>
             </div>
@@ -430,8 +462,10 @@
                                 <p style="margin: 5px 0;"><strong>Saldo restante:</strong> S/ <span
                                         id="pago-saldo-restante">0.00</span></p>
                                 <div id="panel-estado-prestamo" style="margin-top: 10px; display: none;">
-                                    <div style="font-size: 0.9em; color: #2c3e50; margin-bottom: 6px;"><strong>Historial de pagos (?ltimos):</strong></div>
-                                    <div id="lista-pagos-prestamo" style="max-height: 120px; overflow-y: auto; font-size: 0.9em; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #dfe6e9;">
+                                    <div style="font-size: 0.9em; color: #2c3e50; margin-bottom: 6px;"><strong>Historial
+                                            de pagos (?ltimos):</strong></div>
+                                    <div id="lista-pagos-prestamo"
+                                        style="max-height: 120px; overflow-y: auto; font-size: 0.9em; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #dfe6e9;">
                                         <em>Sin pagos registrados</em>
                                     </div>
                                 </div>
@@ -463,7 +497,7 @@
 
                                     <div id="linea-mora"
                                         style="display: none; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ddd;">
-                                        <span style="color: #e74c3c;"><strong>⚠️ Mora (1%):</strong></span>
+                                        <span style="color: #e74c3c;"><strong>⚠ Mora (1%):</strong></span>
                                         <span id="cuota-mora-monto" style="color: #e74c3c; font-weight: bold;">S/
                                             0.00</span>
                                     </div>
@@ -493,26 +527,34 @@
                                         style="color: #f57c00; font-weight: bold; display: none;"></small>
                                 </div>
 
-                                <div class="form-group">
-                                    <label>Medio de Pago:</label>
-                                    <select id="medio-pago" onchange="actualizarRedondeo()">
-                                        <option value="EFECTIVO">💵 Efectivo (con redondeo)</option>
-                                        <option value="YAPE">📱 Yape (cobro exacto)</option>
-                                        <option value="PLIN">📱 Plin (cobro exacto)</option>
-                                        <option value="TARJETA">💳 Tarjeta (cobro exacto)</option>
-                                        <option value="FLOW">🔵 Flow</option>
-                                    </select>
-                                </div>
-
-                                <button class="btn-secondary" style="width: 100%; padding: 12px;"
-                                    onclick="procesarPago()">
-                                    💳 Procesar Pago
-                                </button>
+                                <select id="medio-pago" onchange="actualizarRedondeo()">
+                                    <option value="EFECTIVO">💵 Efectivo (con redondeo)</option>
+                                    <option value="FLOW">🔵 Flow (Link de Pago)</option>
+                                </select>
                             </div>
-                        </div>
 
-                        <div id="mensaje-pago" class="mensaje"></div>
+                            <!-- SECCIÓN EFECTIVO (Visible solo si es efectivo) -->
+                            <div id="seccion-pago-efectivo"
+                                style="display:none; background: #e8f5e9; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                                <div class="form-group">
+                                    <label>💵 Efectivo Entregado:</label>
+                                    <input type="number" id="monto-efectivo-entregado" placeholder="Monto recibido"
+                                        step="0.01" oninput="calcularVueltoUI()">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: bold; color: #2e7d32;">💰 Vuelto a Entregar:</span>
+                                    <span id="texto-vuelto"
+                                        style="font-size: 1.4em; font-weight: bold; color: #2e7d32;">S/ 0.00</span>
+                                </div>
+                            </div>
+
+                            <button class="btn-secondary" style="width: 100%; padding: 12px;" onclick="procesarPago()">
+                                💳 Procesar Pago
+                            </button>
+                        </div>
                     </div>
+
+                    <div id="mensaje-pago" class="mensaje"></div>
                 </div>
             </div>
 
@@ -523,7 +565,6 @@
                         <h3>🏦 Control de Caja</h3>
                     </div>
                     <div class="card-body">
-
                         <!-- Caja Cerrada -->
                         <div id="caja-cerrada" style="text-align: center; padding: 20px;">
                             <h3>🔴 La Caja está Cerrada</h3>
@@ -552,54 +593,51 @@
                                     <div class="card-body">
                                         <h4 style="border-bottom: 2px solid #ddd; padding-bottom: 5px;">📊 Reporte de
                                             Turno</h4>
-                                        <table style="width: 100%; border-collapse: separate; border-spacing: 0 5px;">
+                                        <table style="width: 100%; border-collapse: separate; border-spacing: 0 10px;">
+                                            <!-- Fila oculta para compatibilidad JS -->
+                                            <tr style="display:none;">
+                                                <td><span id="resumen-total-cajon">0.00</span></td>
+                                            </tr>
+
                                             <tr>
-                                                <td><strong>Fondo Inicial:</strong></td>
-                                                <td style="text-align: right;">S/ <span id="resumen-inicial">0.00</span>
+                                                <td style="padding: 10px; color: #7f8c8d;">🏦 Fondo Inicial:</td>
+                                                <td
+                                                    style="text-align: right; padding: 10px; font-weight: bold; color: #7f8c8d;">
+                                                    S/ <span id="resumen-inicial">0.00</span>
                                                 </td>
                                             </tr>
+
+                                            <tr style="background-color: #fff3e0;">
+                                                <td style="padding: 10px; border-radius: 5px 0 0 5px; color: #e65100;">
+                                                    💵 Ventas Efectivo:</td>
+                                                <td
+                                                    style="text-align: right; padding: 10px; font-weight: bold; border-radius: 0 5px 5px 0; color: #e65100;">
+                                                    S/ <span id="resumen-efectivo">0.00</span>
+                                                </td>
+                                            </tr>
+
+                                            <tr>
+                                                <td style="padding: 10px; color: #2c3e50;">💳 Digital (Flow):</td>
+                                                <td
+                                                    style="text-align: right; padding: 10px; font-weight: bold; color: #2c3e50;">
+                                                    S/ <span id="resumen-flow">0.00</span>
+                                                </td>
+                                            </tr>
+
                                             <tr>
                                                 <td colspan="2">
-                                                    <hr style="margin: 5px 0; border: 0; border-top: 1px dashed #ccc;">
+                                                    <hr style="margin: 0; border: 0; border-top: 2px solid #aaa;">
                                                 </td>
                                             </tr>
-                                            <tr>
-                                                <td colspan="2" style="color: #2c3e50;"><strong>INGRESOS (Ventas del
-                                                        Día)</strong></td>
-                                            </tr>
-                                            <tr>
-                                                <td style="padding-left: 10px;">💵 Efectivo Cobrado:</td>
-                                                <td style="text-align: right;">S/ <span
-                                                        id="resumen-efectivo">0.00</span></td>
-                                            </tr>
-                                            <tr>
-                                                <td style="padding-left: 10px;">📱 Yape/Plin (Banco):</td>
-                                                <td style="text-align: right;">S/ <span id="resumen-digital">0.00</span>
+
+                                            <tr style="background-color: #dcedc8;">
+                                                <td style="padding: 10px; border-radius: 5px 0 0 5px; color: #1b5e20;">
+                                                    <strong>📈 TOTAL EN EFECTIVO:</strong>
                                                 </td>
-                                            </tr>
-                                            <tr>
-                                                <td style="padding-left: 10px;">💳 Tarjeta (Banco):</td>
-                                                <td style="text-align: right;">S/ <span id="resumen-tarjeta">0.00</span>
+                                                <td
+                                                    style="text-align: right; padding: 10px; font-weight: bold; font-size: 1.3em; color: #1b5e20; border-radius: 0 5px 5px 0;">
+                                                    S/ <span id="resumen-total-general">0.00</span>
                                                 </td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="2">
-                                                    <hr
-                                                        style="margin: 5px 0; border: 0; border-top: 2px solid #2c3e50;">
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style="color: #e67e22;"><strong>CUADRE DE EFECTIVO</strong></td>
-                                                <td></td>
-                                            </tr>
-                                            <tr>
-                                                <td style="font-size: 0.9em;">(Inicial + Efectivo Cobrado)</td>
-                                                <td></td>
-                                            </tr>
-                                            <tr style="background-color: #ffe0b2; font-weight: bold;">
-                                                <td style="padding: 5px;">💰 DEBE HABER EN CAJÓN:</td>
-                                                <td style="text-align: right; padding: 5px; font-size: 1.2em;">S/ <span
-                                                        id="resumen-total-cajon">0.00</span></td>
                                             </tr>
                                         </table>
                                     </div>
@@ -609,9 +647,9 @@
                                     <div class="card-body">
                                         <h4>Arqueo / Cierre</h4>
                                         <div class="form-group">
-                                            <label>Monto Real en Efectivo (Contado):</label>
+                                            <label>Dinero Recaudado en el Día:</label>
                                             <input type="number" id="monto-real-cierre"
-                                                placeholder="¿Cuánto dinero tienes físicamente?">
+                                                placeholder="Cuanto dinero recaudaste al dia">
                                         </div>
                                         <button class="btn-secondary" style="width: 100%; background: #e67e22;"
                                             onclick="cerrarCaja()">
@@ -627,55 +665,11 @@
                 </div>
             </div>
 
-            <!-- SECCIÓN EMPLEADOS -->
-            <div id="seccion-empleados" class="seccion" style="display:none;">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>👥 Gestión de Empleados</h3>
-                        <button class="btn-small" onclick="cargarEmpleados()">🔄 Actualizar</button>
-                    </div>
-                    <div class="card-body">
-
-                        <!-- Formulario Nuevo Empleado -->
-                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h4>Nuevo Empleado</h4>
-                            <div class="input-group" style="margin-bottom: 10px;">
-                                <input type="text" id="emp-nombre" placeholder="Nombre completo">
-                                <input type="text" id="emp-usuario" placeholder="Usuario (Login)">
-                            </div>
-                            <div class="input-group">
-                                <input type="password" id="emp-password" placeholder="Contraseña">
-                                <select id="emp-rol">
-                                    <option value="CAJERO">Cajero</option>
-                                    <option value="ADMIN">Administrador</option>
-                                </select>
-                                <button class="btn-secondary" onclick="crearEmpleado()">➕ Crear</button>
-                            </div>
-                            <div id="mensaje-empleado" class="mensaje"></div>
-                        </div>
-
-                        <!-- Lista de Empleados -->
-                        <table class="tabla-clientes">
-                            <thead>
-                                <tr>
-                                    <th>Nombre</th>
-                                    <th>Usuario</th>
-                                    <th>Rol</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="listaEmpleados"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECCIÓN CONFIGURACIÓN (SOLO ADMIN) -->
+            <!-- SECCIÓN CONFIGURACIÓN -->
             <div id="seccion-config" class="seccion" style="display:none;">
                 <div class="card">
                     <div class="card-header">
-                        <h3>⚙️ Configuración del Sistema</h3>
+                        <h3>⚙ Configuración del Sistema</h3>
                     </div>
                     <div class="card-body">
 
@@ -695,125 +689,44 @@
                             </div>
                         </div>
 
+                        <!-- Simulación de Fecha -->
+                        <div
+                            style="background: #fff3e0; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #e67e22;">
+                            <h4 style="margin-top: 0;">📅 Simulación de Fecha (Sistema)</h4>
+                            <p style="margin: 0 0 10px 0; color: #d35400; font-size: 0.9em;">
+                                ⚠ Afecta Caja y Mora.
+                            </p>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <div class="input-group"
+                                    style="max-width: 350px; display: flex; gap: 10px; align-items: center;">
+                                    <input type="date" id="config-fecha-sistema" class="form-control" style="flex: 1;">
+                                    <button class="btn-primary" onclick="guardarFechaSistema()"
+                                        style="background: #e67e22; border: none; padding: 8px 15px; white-space: nowrap;">
+                                        💾 Cambiar
+                                    </button>
+                                </div>
+                                <small style="display: block; margin-top: 5px; color: #666;">
+                                    Actual: <span id="fecha-servidor-actual"
+                                        style="font-weight:bold; color: #333;">...</span>
+                                </small>
+                            </div>
+                        </div>
+
                         <!-- Info del Sistema -->
                         <div style="background: #e8f4fd; padding: 20px; border-radius: 8px;">
-                            <h4>ℹ️ Información del Sistema</h4>
+                            <h4>ℹ Información del Sistema</h4>
                             <p><strong>Versión:</strong> 2.0 - AGILE Préstamos</p>
                             <p><strong>Servidor:</strong> <span id="config-servidor-url">-</span></p>
                             <p><strong>Usuario Actual:</strong> <span id="config-usuario-actual">-</span></p>
                             <p><strong>Rol:</strong> <span id="config-rol-actual">-</span></p>
                         </div>
 
-                    </div>
-
-                    <div id="mensaje-pago" class="mensaje"></div>
-                </div>
-            </div>
-    </div>
-
-
-    <!-- SECCIÓN CONFIGURACIÓN (SOLO ADMIN) -->
-    <div id="seccion-config" class="seccion" style="display:none;">
-        <div class="card">
-            <div class="card-header">
-                <h3>⚙️ Configuración del Sistema</h3>
-            </div>
-            <div class="card-body">
-
-                <!-- Parámetros de Mora -->
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h4>📊 Parámetros de Mora</h4>
-                    <div class="form-group">
-                        <label>Porcentaje de Mora Diaria (%):</label>
-                        <div class="input-group">
-                            <input type="number" id="config-mora-porcentaje" step="0.01" min="0" max="100" value="1"
-                                style="width: 100px;">
-                            <span style="padding: 10px;">%</span>
-                            <button class="btn-secondary" onclick="guardarConfigMora()">💾 Guardar</button>
-                        </div>
-                        <small style="color: #666;">Actualmente: La mora se calcula como [Saldo Pendiente] ×
-                            [Porcentaje/100]</small>
+                        <div id="mensaje-config" class="mensaje" style="margin-top: 15px;"></div>
                     </div>
                 </div>
-
-                <!-- Info del Sistema -->
-                <div style="background: #e8f4fd; padding: 20px; border-radius: 8px;">
-                    <h4>ℹ️ Información del Sistema</h4>
-                    <p><strong>Versión:</strong> 2.0 - AGILE Préstamos</p>
-                    <p><strong>Servidor:</strong> <span id="config-servidor-url">-</span></p>
-                    <p><strong>Usuario Actual:</strong> <span id="config-usuario-actual">-</span></p>
-                    <p><strong>Rol:</strong> <span id="config-rol-actual">-</span></p>
-                </div>
-
-                <div id="mensaje-config" class="mensaje" style="margin-top: 15px;"></div>
             </div>
-        </div>
-    </div>
 
-    <!-- SECCIÓN CALENDARIO -->
-    <div id="seccion-calendario" class="seccion" style="display:none;">
-                <!-- Calendario oculto -->
-        <div class="card">
-            <div class="card-header">
-                <h3>📅 Calendario de Vencimientos</h3>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-small" onclick="cambiarMesCalendario(-1)">◀ Anterior</button>
-                    <span id="calendario-mes-actual"
-                        style="padding: 8px 15px; background: rgba(255,255,255,0.2); border-radius: 8px;"></span>
-                    <button class="btn-small" onclick="cambiarMesCalendario(1)">Siguiente ▶</button>
-                </div>
-            </div>
-            <div class="card-body">
-                <!-- Leyenda del calendario -->
-                <div class="calendario-legend">
-                    <div class="legend-item">
-                        <span class="legend-dot hoy"></span>
-                        <span>Hoy</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot pendiente"></span>
-                        <span>Con vencimientos</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot vencido"></span>
-                        <span>Vencidos</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot pagado"></span>
-                        <span>Pagados</span>
-                    </div>
-                </div>
-
-                <div id="calendario-grid" class="calendario-container">
-                    <!-- Calendario será generado por JS -->
-                </div>
-
-
-                <!-- Lista de vencimientos del día seleccionado -->
-                <div id="vencimientos-dia" style="margin-top: 20px; display: none;">
-                    <h4 id="vencimientos-dia-titulo">Vencimientos del día</h4>
-                    <div id="lista-vencimientos-dia"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Enviar recordatorios -->
-        <div class="card" style="margin-top: 20px;">
-            <div class="card-header">
-                <h3>📧 Enviar Recordatorios</h3>
-            </div>
-            <div class="card-body">
-                <p style="margin-bottom: 15px;">Enviar recordatorio por WhatsApp a todos los clientes con cuotas
-                    vencidas:</p>
-                <button class="btn-secondary" onclick="enviarRecordatoriosMasivos()">
-                    📱 Enviar Recordatorios WhatsApp
-                </button>
-                <div id="mensaje-recordatorios" class="mensaje" style="margin-top: 15px;"></div>
-            </div>
-        </div>
-    </div>
-
-    </main>
+        </main>
     </div>
 
     <!-- Script Principal -->

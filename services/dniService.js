@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 const TOKEN = process.env.DNI_API_TOKEN;
-// URLs de la API V1 (La que te funcionó)
+// URLs de la API V1
 const URL_DNI = 'https://api.apis.net.pe/v1/dni?numero=';
 const URL_RUC = 'https://api.apis.net.pe/v1/ruc?numero=';
 
@@ -35,7 +35,7 @@ async function consultarDni(numero) {
     const response = await axios.get(`${URL_DNI}${numero}`, {
       headers: {
         'Authorization': `Bearer ${TOKEN}`,
-        'Referer': 'https://apis.net.pe/api-tipo-cambio-v2',
+        'Referer': 'https://apis.net.pe/api-consulta-dni', // Referer específico para DNI
         'Accept': 'application/json'
       },
       timeout: 5000
@@ -85,7 +85,7 @@ async function consultarRuc(numero) {
     const response = await axios.get(`${URL_RUC}${numero}`, {
       headers: {
         'Authorization': `Bearer ${TOKEN}`,
-        'Referer': 'https://apis.net.pe/api-tipo-cambio-v2',
+        'Referer': 'https://apis.net.pe/api-consulta-ruc',
         'Accept': 'application/json'
       },
       timeout: 5000

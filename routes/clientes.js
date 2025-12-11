@@ -1,7 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db/firebase');
+const { db, storage } = require('../db/firebase');
 const { consultarDni, consultarRuc } = require('../services/dniService');
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
+
+// Configuración Multer: Memoria (para subir a Firebase)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos PDF'));
+    }
+  }
+});
 
 const clientesRef = db.collection('clientes');
 
@@ -71,8 +86,10 @@ router.post('/crear-desde-api', async (req, res) => {
 });
 
 // POST /clientes - Registro directo manual (sin consultar API externa)
-router.post('/', async (req, res) => {
-  const { tipo, documento, nombre, direccion, telefono, email } = req.body;
+// Ahora soporta FormData y Archivos (declaracion_jurada)
+router.post('/', upload.single('declaracion_jurada'), async (req, res) => {
+  // Con multer, req.body tiene los campos de texto y req.file el archivo
+  const { tipo, documento, nombre, direccion, telefono, email, es_juridica } = req.body;
 
   // Validaciones
   if (!tipo || !documento || !nombre || !direccion || !telefono) {
@@ -103,8 +120,45 @@ router.post('/', async (req, res) => {
       direccion,
       telefono,
       email: email || '',
+      email: email || '',
+      es_juridica: es_juridica === 'true' || es_juridica === true,
       creado_en: new Date().toISOString()
     };
+
+    // Subir a Firebase Storage si hay archivo
+    if (req.file) {
+      try {
+        const bucket = storage.bucket();
+        const filename = `declaraciones/${documento}_${Date.now()}.pdf`;
+        const fileUpload = bucket.file(filename);
+        const uuidToken = uuidv4();
+
+        await fileUpload.save(req.file.buffer, {
+          metadata: {
+            contentType: req.file.mimetype,
+            metadata: {
+              firebaseStorageDownloadTokens: uuidToken
+            }
+          }
+        });
+
+        // Construir URL pública formato Firebase
+        // https://firebasestorage.googleapis.com/v0/b/[bucket]/o/[path]?alt=media&token=[token]
+        const bucketName = bucket.name;
+        const encodedPath = encodeURIComponent(filename);
+        const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${uuidToken}`;
+
+        nuevoCliente.declaracion_jurada_url = downloadUrl;
+        console.log('✅ Archivo subido a Firebase:', downloadUrl);
+
+      } catch (uploadError) {
+        console.error('❌ Error subiendo a Firebase Storage:', uploadError);
+        // No fallamos toda la creación, pero avisamos
+        nuevoCliente.error_upload = uploadError.message;
+      }
+    } else {
+      nuevoCliente.declaracion_jurada_url = '';
+    }
 
     const docRef = await clientesRef.add(nuevoCliente);
     res.json({ id: docRef.id, ...nuevoCliente, creado: true });
@@ -154,3 +208,60 @@ router.get('/consulta-externa/:tipo/:documento', async (req, res) => {
 });
 
 module.exports = router;
+
+// PUT /clientes/:id - Actualizar datos de cliente
+// También soportamos archivo si lo suben al editar
+router.put('/:id', upload.single('declaracion_jurada'), async (req, res) => {
+  const { id } = req.params;
+  const { nombre, direccion, telefono, email, es_juridica } = req.body;
+
+  if (!nombre || !direccion || !telefono) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios' });
+  }
+
+  try {
+    const updateData = {
+      nombre: nombre.toUpperCase(),
+      direccion,
+      telefono,
+      email: email || '',
+      es_juridica: es_juridica === 'true' || es_juridica === true
+    };
+
+    if (req.file) {
+      try {
+        const bucket = storage.bucket();
+        // Usamos el documento original (o el nuevo si cambió, pero aqui no tenemos el doc antiguo facilmente a mano salvo que lo busquemos)
+        // Usamos el ID del cliente para el nombre del archivo en update
+        const filename = `declaraciones/${id}_${Date.now()}.pdf`;
+        const fileUpload = bucket.file(filename);
+        const uuidToken = uuidv4();
+
+        await fileUpload.save(req.file.buffer, {
+          metadata: {
+            contentType: req.file.mimetype,
+            metadata: {
+              firebaseStorageDownloadTokens: uuidToken
+            }
+          }
+        });
+
+        const bucketName = bucket.name;
+        const encodedPath = encodeURIComponent(filename);
+        const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${uuidToken}`;
+
+        updateData.declaracion_jurada_url = downloadUrl;
+
+      } catch (uploadError) {
+        console.error('❌ Error subiendo a Firebase Storage (Update):', uploadError);
+      }
+    }
+
+    await clientesRef.doc(id).update(updateData);
+
+    res.json({ success: true, message: 'Cliente actualizado correctamente' });
+  } catch (err) {
+    console.error('Error actualizando cliente:', err);
+    res.status(500).json({ error: err.message });
+  }
+});

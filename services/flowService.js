@@ -54,7 +54,7 @@ async function createPayment(data) {
 
     // MODO NORMAL (Sandbox/Producción)
     // Flow requiere mínimo S/. 2.00 PEN
-    const finalAmount = Math.max(Math.round(data.amount), 2);
+    const finalAmount = Math.max(Number(data.amount), 2);
 
     const params = {
         apiKey: API_KEY,

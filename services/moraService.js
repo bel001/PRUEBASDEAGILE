@@ -1,6 +1,8 @@
+const { getSystemDate } = require('../utils/dateHelper');
+
 // 1% de mora si está vencida
 function esVencida(fecha_vencimiento) {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = getSystemDate().toISOString().split('T')[0];
   return fecha_vencimiento < hoy;
 }
 

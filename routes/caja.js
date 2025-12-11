@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db/firebase');
+const { db } = require('../db/firebase');
+const { getSystemDate } = require('../utils/dateHelper');
 
 const cajaRef = db.collection('cierre_caja');
 
@@ -17,13 +18,27 @@ router.post('/apertura', async (req, res) => {
   if (monto_inicial == null) return res.status(400).json({ error: 'Falta monto_inicial' });
 
   try {
+    // Validar si YA EXISTE una caja (abierta o cerrada) con fecha de HOY
+    // Usamos el inicio del día para la consulta
+    const hoyInicio = getSystemDate();
+    hoyInicio.setHours(0, 0, 0, 0);
+    const hoyISO = hoyInicio.toISOString();
+
+    const chequeoHoy = await cajaRef
+      .where('fecha', '>=', hoyISO)
+      .get();
+
+    if (!chequeoHoy.empty) {
+      return res.status(400).json({ error: 'Ya se aperturo la caja el día de hoy' });
+    }
+
     const ultima = await obtenerUltimaCaja();
     if (ultima && !ultima.cerrado) {
-      return res.status(400).json({ error: 'Ya hay una caja abierta' });
+      return res.status(400).json({ error: 'Ya hay una caja abierta (de un día anterior sin cerrar)' });
     }
 
     const nuevaCaja = {
-      fecha: new Date().toISOString(),
+      fecha: getSystemDate().toISOString(),
       monto_inicial: Number(monto_inicial),
       cerrado: false,
       total_sistema: 0,
@@ -45,17 +60,31 @@ router.get('/resumen-actual', async (req, res) => {
     if (!ultima) return res.status(404).json({ error: 'No hay caja' });
     if (ultima.cerrado) return res.status(400).json({ error: 'La caja está cerrada' });
 
-    // Buscar pagos desde la fecha de apertura
-    // Nota: Comparar cadenas ISO funciona bien
+    // Calcular límite superior (final del día de apertura + buffer o simplemente start of next day)
+    // Para asegurar que no traiga pagos de "futuros días" si viajamos al pasado.
+    const fechaApertura = new Date(ultima.fecha);
+    const fechaLimite = new Date(fechaApertura);
+    fechaLimite.setDate(fechaLimite.getDate() + 1);
+    fechaLimite.setHours(0, 0, 0, 0); // Inicio del día siguiente
+    // Ajuste por si la apertura fue muy cerca del cambio de día, mejor dar margen hasta fin del día de la fecha de apertura
+    // Mejor: tomamos la fecha de apertura, le sumamos 1 día calendario y cortamos a las 00:00.
+
+    // Buscar pagos desde la fecha de apertura hasta el limite del día
+    console.log(`🔍 [Resumen Caja] Apertura: ${ultima.fecha} | Límite: ${fechaLimite.toISOString()}`);
+
     const pagosSnap = await db.collection('pagos')
       .where('fecha_pago', '>=', ultima.fecha)
+      .where('fecha_pago', '<', fechaLimite.toISOString())
       .get();
+
+    console.log(`🔍 [Resumen Caja] Pagos encontrados: ${pagosSnap.size}`);
 
     // Solo se manejan dos grupos: EFECTIVO y FLOW (digital)
     let totales = { EFECTIVO: 0, FLOW: 0 };
 
     pagosSnap.forEach(doc => {
       const p = doc.data();
+      console.log(`   - Pago: ${p.monto_pagado} (${p.medio_pago}) fecha: ${p.fecha_pago}`);
       const monto = Number(p.monto_pagado);
       if (p.medio_pago === 'EFECTIVO') {
         totales.EFECTIVO += monto;
@@ -96,10 +125,17 @@ router.post('/cierre', async (req, res) => {
     const ultima = await obtenerUltimaCaja();
     if (!ultima || ultima.cerrado) return res.status(400).json({ error: 'No hay caja abierta' });
 
-    // Recalcular totales
+    // Recalcular totales con el mismo limite
+    const fechaApertura = new Date(ultima.fecha);
+    const fechaLimite = new Date(fechaApertura);
+    fechaLimite.setDate(fechaLimite.getDate() + 1);
+    fechaLimite.setHours(0, 0, 0, 0);
+
     const pagosSnap = await db.collection('pagos')
       .where('fecha_pago', '>=', ultima.fecha)
+      .where('fecha_pago', '<', fechaLimite.toISOString())
       .get();
+
 
     let total_efectivo_sistema = 0;
     let total_digital_sistema = 0;
@@ -136,7 +172,7 @@ router.post('/cierre', async (req, res) => {
     // Actualizar caja a cerrada
     await cajaRef.doc(ultima.id).update({
       cerrado: true,
-      fecha_cierre: new Date().toISOString(),
+      fecha_cierre: getSystemDate().toISOString(),
       monto_final_sistema: saldo_teorico_cajon, // Lo que el sistema dice que debe haber en cajón
       monto_final_real: Number(total_real_efectivo), // Lo que contó el cajero
       diferencia: diferencia,

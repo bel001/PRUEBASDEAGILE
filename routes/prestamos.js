@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db/firebase'); // Cambiado a Firebase
+const { db } = require('../db/firebase'); // Cambiado a Firebase
 const { recalcularPrestamoDesdeCuotas } = require('../services/pagosService');
 
 const MAX_CUOTAS = 24;
@@ -8,12 +8,12 @@ const MAX_MONTO = 20000;
 
 // POST /prestamos - Crear préstamo y sus cuotas
 router.post('/', async (req, res) => {
-  const { cliente_id, monto_total, num_cuotas } = req.body;
+  const { cliente_id, monto_capital, num_cuotas, tea } = req.body;
 
-  if (!cliente_id || !monto_total || !num_cuotas) {
-    return res.status(400).json({ error: 'Faltan datos obligatorios' });
+  if (!cliente_id || !monto_capital || !num_cuotas || tea == null) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios (Capital, Cuotas, TEA)' });
   }
-  if (monto_total > MAX_MONTO) return res.status(400).json({ error: 'Monto excede el máximo' });
+  if (monto_capital > MAX_MONTO) return res.status(400).json({ error: 'Capital excede el máximo' });
   if (num_cuotas > MAX_CUOTAS) return res.status(400).json({ error: 'Excede max cuotas' });
 
   try {
@@ -24,63 +24,109 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
-    // 2. Verificar si ya tiene préstamo activo (no cancelado)
+    // 2. Verificar si ya tiene préstamo activo
     const activos = await db.collection('prestamos')
       .where('cliente_id', '==', cliente_id)
       .where('cancelado', '==', false)
       .get();
-
     if (!activos.empty) {
       return res.status(400).json({ error: 'El cliente ya tiene un préstamo activo' });
     }
 
-    // 3. Preparar escritura en lote (Batch) para que sea todo o nada
+    // 3. Cálculos Financieros (Método Francés / Cuota Fija)
+    // Convertir TEA a TEM
+    // Fórmula: TEM = (1 + TEA%)^(1/12) - 1
+    const teaDecimal = Number(tea) / 100;
+    const temDecimal = Math.pow(1 + teaDecimal, 1 / 12) - 1;
+
+    const capital = Number(monto_capital);
+    const n = Number(num_cuotas);
+
+    // Calcular Cuota Fija (R)
+    // R = P * [ i(1+i)^n ] / [ (1+i)^n - 1 ]
+    // Si la tasa es 0 (caso raro), cuota = P / n
+    let monto_cuota;
+    if (temDecimal === 0) {
+      monto_cuota = capital / n;
+    } else {
+      const factor = Math.pow(1 + temDecimal, n);
+      monto_cuota = capital * ((temDecimal * factor) / (factor - 1));
+    }
+
+    // Redondeamos la cuota a 2 decimales para cobro, pero ojo que esto genera pequeñas diferencias al final
+    // Para exactitud financiera, se suele ajustar la última cuota, pero por simplicidad de este sistema:
+    monto_cuota = Number(monto_cuota.toFixed(2));
+
+    // El monto total a pagar por el cliente será Cuota * N
+    const monto_total = Number((monto_cuota * n).toFixed(2));
+
+    // 4. Preparar Batch
     const batch = db.batch();
-
-    // Crear referencia del nuevo préstamo
     const prestamoRef = db.collection('prestamos').doc();
-    const fechaInicio = new Date();
 
-    const monto_cuota = Number((monto_total / num_cuotas).toFixed(2));
+    // USAR FECHA PROPORCIONADA O DEFAULT A HOY
+    let fechaInicio;
+    if (req.body.fecha_inicio) {
+      // Asumimos formato YYYY-MM-DD. Le agregamos T12:00:00 para evitar problemas de timezone
+      fechaInicio = new Date(req.body.fecha_inicio + 'T12:00:00');
+    } else {
+      fechaInicio = new Date();
+    }
 
-    // Guardar datos del préstamo
+    // Guardar Préstamo
     batch.set(prestamoRef, {
       cliente_id,
-      monto_total,
+      monto_capital: capital,
+      tea: Number(tea), // %
+      tem: Number((temDecimal * 100).toFixed(4)), // % (guardamos con 4 decimales para referencia)
+      monto_total,     // Deuda Total (Capital + Intereses)
       num_cuotas,
       monto_por_cuota: monto_cuota,
       fecha_inicio: fechaInicio.toISOString().split('T')[0],
-      cancelado: false, // Bandera para saber si ya pagó todo
+      cancelado: false,
+      saldo_restante: monto_total, // IMPORTANTE: Inicializar saldo_restante
+      monto_pagado_total: 0,
+      estado: 'PENDIENTE',
       creado_en: new Date().toISOString()
     });
 
+    // 5. Generar Cronograma (Amortización)
     const cronograma = [];
+    let saldo_pendiente = capital;
 
-    // 4. Generar Cuotas con EXACTAMENTE 30 días entre cada una
-    for (let i = 1; i <= num_cuotas; i++) {
-      // Calcular fecha: fecha_inicio + (i * 30 días)
-      const diasDesdeInicio = i * 30;
-      const fecha_vencimiento_date = new Date(fechaInicio);
-      fecha_vencimiento_date.setDate(fecha_vencimiento_date.getDate() + diasDesdeInicio);
-      const fecha_vencimiento = fecha_vencimiento_date.toISOString().split('T')[0];
+    for (let i = 1; i <= n; i++) {
+      // Interés del periodo
+      let interes = saldo_pendiente * temDecimal;
 
-      const cuotaRef = db.collection('cuotas').doc(); // ID automático
+      // Amortización (Capital que se paga en esta cuota)
+      let amortizacion = monto_cuota - interes;
+
+      saldo_pendiente -= amortizacion;
+      if (saldo_pendiente < 0) saldo_pendiente = 0; // Evitar negativos por redondeo
+
+      // Calcular fecha de vencimiento (cada 30 días)
+      const fechaVenc = new Date(fechaInicio);
+      fechaVenc.setDate(fechaInicio.getDate() + (i * 30));
+      const fecha_vencimiento = fechaVenc.toISOString().split('T')[0];
+
+      const cuotaRef = db.collection('cuotas').doc();
       const dataCuota = {
         prestamo_id: prestamoRef.id,
-        cliente_id: cliente_id, // Para búsquedas rápidas
+        cliente_id: cliente_id,
         numero_cuota: i,
         fecha_vencimiento,
-        monto_cuota,
-        saldo_pendiente: monto_cuota,
+        monto_cuota: monto_cuota,   // Valor fijo a pagar
+        interes_calculado: Number(interes.toFixed(2)),
+        amortizacion_capital: Number(amortizacion.toFixed(2)),
+        saldo_pendiente: monto_cuota, // Inicialmente debe todo el monto de la cuota
+        saldo_capital_restante: Number(saldo_pendiente.toFixed(2)), // Referencial
         pagada: false
       };
 
       batch.set(cuotaRef, dataCuota);
-
       cronograma.push({ cuota_id: cuotaRef.id, ...dataCuota });
     }
 
-    // Ejecutar todo junto
     await batch.commit();
 
     res.json({

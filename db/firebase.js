@@ -25,11 +25,19 @@ if (process.env.FIREBASE_PRIVATE_KEY) {
   }
 }
 
+// Determinar bucket name
+// Determinar bucket name
+const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'agile-prestamos.firebasestorage.app';
+
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
+  storageBucket: bucketName
 });
 
 const db = admin.firestore();
-console.log("✅ Base de datos Firebase conectada");
+const storage = admin.storage();
 
-module.exports = db;
+console.log("✅ Base de datos Firebase conectada");
+console.log("✅ Firebase Storage configurado:", bucketName);
+
+module.exports = { db, storage, admin };

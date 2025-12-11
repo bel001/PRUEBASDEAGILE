@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db/firebase'); // Conexión Firebase
+const { db } = require('../db/firebase'); // Conexión Firebase
 const { aplicarRedondeo } = require('../services/pagoService');
 const { calcularMora, esVencida } = require('../services/moraService');
 const {
@@ -8,6 +8,10 @@ const {
   agregarPagoAHistorialPrestamo
 } = require('../services/pagosService');
 const { enviarComprobanteEmail } = require('../services/emailService');
+const { sendWhatsAppText, sendWhatsAppPdf } = require('../services/ultramsgService');
+const { getSystemDate } = require('../utils/dateHelper');
+
+const { registrarMovimientoCaja } = require('../services/cajaService');
 
 // Helper: Verificar si la caja está abierta
 async function cajaAbiertaHoy() {
@@ -23,7 +27,7 @@ async function cajaAbiertaHoy() {
 
 // POST /pagos
 router.post('/', async (req, res) => {
-  const { cuota_id, monto_pagado, medio_pago, canal_comprobante, email } = req.body;
+  const { cuota_id, monto_pagado, medio_pago, canal_comprobante, email, monto_efectivo_entregado } = req.body;
 
   if (!cuota_id || !monto_pagado || !medio_pago) {
     return res.status(400).json({ error: 'Faltan datos obligatorios' });
@@ -112,6 +116,26 @@ router.post('/', async (req, res) => {
 
     const { montoCobrar, ajuste } = aplicarRedondeo(monto_pagado, medioPago);
 
+    // --- VALIDACIÓN DE EFECTIVO Y VUELTO ---
+    let vuelto = 0;
+    let efectivoEntregado = 0;
+
+    if (medioPago === 'EFECTIVO') {
+      if (!monto_efectivo_entregado) {
+        return res.status(400).json({ error: 'Debe ingresar el monto de efectivo entregado.' });
+      }
+      efectivoEntregado = Number(monto_efectivo_entregado);
+
+      // Validar suficiencia
+      if (efectivoEntregado < montoCobrar) {
+        return res.status(400).json({
+          error: `El efectivo entregado (S/ ${efectivoEntregado.toFixed(2)}) es menor al monto a pagar (S/ ${montoCobrar.toFixed(2)}).`
+        });
+      }
+
+      vuelto = Number((efectivoEntregado - montoCobrar).toFixed(2));
+    }
+
     // Recalcular distribucion con montoCobrar (agregando ajuste si efectivo)
     // Si hubo redondeo, el montoCobrar es el oficial. Re-aplicamos lógica distribución.
 
@@ -145,11 +169,15 @@ router.post('/', async (req, res) => {
     const pagoId = pagoRef.id;
     const pagoData = {
       cuota_id,
-      fecha_pago: new Date().toISOString(),
+      prestamo_id: cuota.prestamo_id,
+      fecha_pago: getSystemDate().toISOString(),
       monto_pagado: montoCobrar, // Monto oficial sistema
       monto_recibido: monto_pagado, // Monto físico
       medio_pago: medioPago,
       redondeo_ajuste: ajuste,
+      // Nuevos campos EFECTIVO
+      monto_entregado: medioPago === 'EFECTIVO' ? efectivoEntregado : null,
+      vuelto: medioPago === 'EFECTIVO' ? vuelto : 0,
       desglose: {
         capital: abono_capital,
         mora: abono_mora
@@ -174,29 +202,124 @@ router.post('/', async (req, res) => {
     // Ejecutamos el batch
     await batch.commit();
 
+    // 4.5. Registrar Movimientos en CAJA (Solo si es EFECTIVO)
+    if (medioPago === 'EFECTIVO') {
+      const descBase = `Pago cuota ${cuota.numero_cuota} / Préstamo ${cuota.prestamo_id}`;
+
+      // A) ENTRADA: El dinero que entrega el cliente
+      await registrarMovimientoCaja('ENTRADA', efectivoEntregado, `Recibido: ${descBase}`, {
+        pago_id: pagoId,
+        cuota_id,
+        prestamo_id: cuota.prestamo_id
+      });
+
+      // B) SALIDA: El vuelto (si existe)
+      if (vuelto > 0) {
+        await registrarMovimientoCaja('SALIDA', vuelto, `Vuelto: ${descBase}`, {
+          pago_id: pagoId,
+          cuota_id,
+          prestamo_id: cuota.prestamo_id
+        });
+      }
+    }
+
     // 5. Registrar en historial del prestamo y recalcular estado/saldo
     await agregarPagoAHistorialPrestamo(db, cuota.prestamo_id, {
       pago_id: pagoId,
       cuota_id,
       monto: monto_pagado,
       medio: medioPago,
-      fecha: new Date().toISOString()
+      fecha: getSystemDate().toISOString()
     });
 
     const resumenPrestamo = await recalcularPrestamoDesdeCuotas(db, cuota.prestamo_id, cuota_id);
 
-    // 6. Enviar Email (Opcional, fuera del proceso critico)
-    if (canal_comprobante === 'EMAIL' && clienteEmail) {
-      // Aqui iria tu logica de email, la dejamos pendiente para no bloquear
-      console.log("Simulando envio de email a:", clienteEmail);
+    // --- NUEVO: GENERAR PDF EN BACKEND Y SUBIR A NUBE ---
+    let pdfUrl = null;
+    try {
+      // Obtener datos del cliente (Nombre y DNI)
+      const prestamoRef = db.collection('prestamos').doc(cuota.prestamo_id);
+      const prestamoSnap = await prestamoRef.get();
+      const prestamoData = prestamoSnap.exists ? prestamoSnap.data() : {};
+
+      // Datos reales
+      let realClienteNombre = prestamoData.cliente_nombre || 'Cliente General';
+      let realClienteDoc = prestamoData.cliente_documento || '-';
+      let realDireccion = 'Inambari';
+
+      let clienteTelefono = '';
+
+      if (prestamoData.cliente_id) {
+        const clienteSnap = await db.collection('clientes').doc(prestamoData.cliente_id).get();
+        if (clienteSnap.exists) {
+          const cData = clienteSnap.data();
+          realClienteNombre = cData.nombre || realClienteNombre;
+          realClienteDoc = cData.documento || realClienteDoc;
+          realDireccion = cData.direccion || realDireccion;
+          clienteTelefono = cData.telefono || '';
+        }
+      }
+
+      // Datos para el PDF
+      const pdfData = {
+        numero_serie: 'B001',
+        numero_comprobante: pagoId.substring(0, 8).toUpperCase(),
+        cliente_nombre: realClienteNombre,
+        cliente_doc: realClienteDoc,
+        direccion: realDireccion,
+        numero_cuota: cuota.numero_cuota,
+        monto_total: montoCobrar,
+        mora: abono_mora,
+        medio_pago: medioPago,
+        // Datos Extra PDF
+        monto_entregado: medioPago === 'EFECTIVO' ? efectivoEntregado : null,
+        vuelto: medioPago === 'EFECTIVO' ? vuelto : 0
+      };
+
+      // Generar
+      const { generarReciboPDF } = require('../services/pdfService');
+      pdfUrl = await generarReciboPDF(pdfData);
+
+      // Guardar URL en el documento del pago
+      await pagoRef.update({ comprobante_url: pdfUrl });
+
+      // --- INTEGRACIÓN ULTRAMSG (WHATSAPP) ---
+      if (clienteTelefono) {
+        // Enviar en background para no demorar la respuesta
+        (async () => {
+          try {
+            console.log(`📱 (Efectivo) Iniciando envío WhatsApp a ${clienteTelefono}...`);
+            const now = new Date();
+            const fechaStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+            const boletaNum = `B001-${pagoId.substring(0, 8).toUpperCase()}`;
+
+            const caption = `📄 *Comprobante de Pago*
+
+Boleta: ${boletaNum}
+Monto: S/ ${montoCobrar.toFixed(2)}
+Fecha: ${fechaStr}
+
+Gracias por tu pago.`;
+
+            await sendWhatsAppPdf(clienteTelefono, pdfUrl, `Comprobante_${boletaNum}.pdf`, caption);
+          } catch (waErr) {
+            console.error('⚠️ Error enviando WhatsApp (UltraMSG):', waErr.message);
+          }
+        })();
+      }
+
+    } catch (pdfErr) {
+      console.error("Error generando PDF para pago efectivo:", pdfErr);
+      // No fallamos la request principal, solo logueamos
     }
 
     res.json({
       pago_id: pagoId,
       monto_cobrado: montoCobrar,
+      vuelto: vuelto, // Retornar vuelto para mostrar en frontend
       nuevo_saldo,
       cuota_pagada: pagada,
-      comprobante: { serie: 'F001', numero: pagoId.substring(0, 8) },
+      comprobante_url: pdfUrl, // URL para abrir directo
       estado_prestamo: resumenPrestamo?.estado,
       saldo_prestamo: resumenPrestamo?.saldoRestante
     });
@@ -242,7 +365,7 @@ router.post('/anular', async (req, res) => {
     batch.update(pagoRef, {
       estado: 'ANULADO',
       anulado_por: usuario_solicitante,
-      fecha_anulacion: new Date().toISOString()
+      fecha_anulacion: getSystemDate().toISOString()
     });
 
     // 2. Revertir saldo en cuota

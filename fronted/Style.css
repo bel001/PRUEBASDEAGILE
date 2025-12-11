@@ -1,65 +1,64 @@
 /* ==================== VARIABLES PRINCIPALES ==================== */
 :root {
-    /* Primary Colors - Elegant Blue */
-    --primary: #1e3a5f;
-    --primary-light: #2d5a8a;
-    --primary-dark: #0f1f33;
+    /* ELEGANT LIGHT THEME PALETTE */
 
-    /* Secondary - Success Green */
-    --secondary: #10b981;
-    --secondary-dark: #059669;
-    --secondary-light: #34d399;
+    /* Brand Colors - Deep Navy & Gold Accent */
+    --primary: #1E3A8A;
+    /* Royal Navy Blue */
+    --primary-light: #3B82F6;
+    /* Brighter Blue */
+    --primary-dark: #172554;
+    /* Very Dark Navy */
 
-    /* Accent - Golden */
-    --accent: #f59e0b;
-    --accent-light: #fbbf24;
+    /* Backgrounds - Clean & airy */
+    --bg-main: #F3F4F6;
+    /* Light Gray/Blueish */
+    --bg-card: #FFFFFF;
+    /* Pure White */
+    --bg-elevated: #F9FAFB;
+    /* Very light gray */
+    --sidebar-bg: #111827;
+    /* Dark sidebar for contrast */
 
-    /* Status Colors */
-    --danger: #ef4444;
-    --danger-light: #fca5a5;
-    --warning: #f97316;
-    --info: #3b82f6;
+    /* Accents */
+    --secondary: #D97706;
+    /* Elegant Amber/Gold */
+    --secondary-dark: #B45309;
+    --accent: #D97706;
 
-    /* Backgrounds */
-    --bg-main: #f8fafc;
-    --bg-card: #ffffff;
-    --bg-elevated: #ffffff;
+    /* Functionals */
+    --danger: #EF4444;
+    --warning: #F59E0B;
+    --info: #0EA5E9;
+    --success: #10B981;
 
-    /* Text */
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    --text-light: #cbd5e1;
+    /* Text - High Legibility */
+    --text-primary: #1F2937;
+    /* Gray 900 */
+    --text-secondary: #4B5563;
+    /* Gray 600 */
+    --text-muted: #9CA3AF;
+    /* Gray 400 */
+    --text-inverse: #FFFFFF;
 
     /* Borders */
-    --border: #e2e8f0;
-    --border-light: #f1f5f9;
+    --border: #E5E7EB;
+    --border-light: #F3F4F6;
 
-    /* Shadows - More Refined */
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
-    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
-    --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.15);
+    /* Shadows - Soft & Professional */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-neon: none;
 
-    /* Glass Effect */
-    --glass-bg: rgba(255, 255, 255, 0.8);
-    --glass-border: rgba(255, 255, 255, 0.2);
-
-    /* Radius */
-    --radius-sm: 8px;
+    /* Spacing & Radius */
+    --sidebar-width: 260px;
+    --radius-sm: 6px;
     --radius: 12px;
     --radius-lg: 16px;
-    --radius-xl: 24px;
-
-    /* Spacing */
-    --sidebar-width: 260px;
 
     /* Transitions */
-    --transition-fast: 0.15s ease;
-    --transition: 0.25s ease;
-    --transition-slow: 0.4s ease;
+    --transition: 0.2s ease-in-out;
 }
 
 /* ==================== RESET Y BASE ==================== */
@@ -186,14 +185,16 @@ body {
 }
 
 /* SIDEBAR */
+/* SIDEBAR */
 .sidebar {
     width: var(--sidebar-width);
-    background: linear-gradient(180deg, var(--primary-dark) 0%, var(--primary) 100%);
-    color: white;
+    background: var(--sidebar-bg);
+    color: #9CA3AF;
     position: fixed;
     height: 100vh;
     overflow-y: auto;
     z-index: 100;
+    border-right: 1px solid #1F2937;
 }
 
 .sidebar-header {
@@ -206,12 +207,16 @@ body {
     font-size: 1.3em;
     font-weight: 700;
     margin-bottom: 5px;
+    color: white;
+    letter-spacing: 1px;
 }
 
 .sidebar-header span {
     font-size: 0.85em;
-    color: var(--accent);
+    color: var(--secondary);
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 .sidebar-nav {
@@ -229,9 +234,9 @@ nav.sidebar-nav {
     display: flex !important;
     align-items: center;
     padding: 14px 25px;
-    color: rgba(255, 255, 255, 0.85) !important;
+    color: #9CA3AF !important;
     text-decoration: none;
-    transition: all 0.3s;
+    transition: all 0.2s;
     cursor: pointer;
     border: none;
     background: transparent;
@@ -239,18 +244,20 @@ nav.sidebar-nav {
     font-size: 0.95em;
     font-family: inherit;
     text-align: left;
+    border-left: 3px solid transparent;
 }
 
 .nav-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
+    background: rgba(255, 255, 255, 0.05);
+    color: white !important;
 }
 
 .nav-item.active {
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
-    border-left: 4px solid var(--accent);
+    background: rgba(30, 58, 138, 0.4);
+    color: white !important;
+    border-left: 3px solid var(--primary-light);
 }
+
 
 .nav-item i,
 .nav-item span.nav-icon {
@@ -417,36 +424,34 @@ nav.sidebar-nav {
 /* ==================== TARJETAS/CARDS ==================== */
 .card {
     background: var(--bg-card);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius);
     box-shadow: var(--shadow);
     margin-bottom: 25px;
     overflow: hidden;
-    transition: all 0.3s;
+    transition: all var(--transition);
+    border: 1px solid var(--border);
 }
 
 .card:hover {
     box-shadow: var(--shadow-lg);
+    border-color: var(--border-light);
 }
 
 .card-header {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    color: white;
-    padding: 18px 24px;
+    background: transparent;
+    color: var(--primary);
+    padding: 20px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-bottom: 1px solid var(--border);
 }
 
 .card-header h3 {
     margin: 0;
-    font-size: 1.1em;
-    font-weight: 600;
-}
-
-.card-header .btn-small {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--primary);
 }
 
 .card-body {
@@ -471,87 +476,73 @@ select,
 textarea {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     font-size: 1em;
-    transition: all 0.3s;
-    background: var(--bg-main);
+    transition: all 0.2s;
+    background: #FFFFFF;
     color: var(--text-primary);
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-    border-color: var(--primary);
+    border-color: var(--primary-light);
     outline: none;
-    box-shadow: 0 0 0 4px rgba(26, 54, 93, 0.1);
-    background: white;
-}
-
-.input-group {
-    display: flex;
-    gap: 12px;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    /* Blue glow */
 }
 
 /* ==================== BOTONES ==================== */
 button {
     cursor: pointer;
-    transition: all 0.3s;
+    transition: all 0.2s;
     font-family: inherit;
+    font-weight: 600;
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    background: var(--primary);
     color: white;
     border: none;
     padding: 12px 24px;
-    border-radius: var(--radius);
-    font-weight: 600;
+    border-radius: var(--radius-sm);
     font-size: 0.95em;
 }
 
 .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(26, 54, 93, 0.3);
+    background: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
 }
 
 .btn-secondary {
-    background: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-dark) 100%);
-    color: white;
-    border: none;
+    background: white;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
     padding: 12px 24px;
-    border-radius: var(--radius);
-    font-weight: 600;
+    border-radius: var(--radius-sm);
 }
 
 .btn-secondary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(56, 161, 105, 0.3);
+    background: var(--bg-elevated);
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
 }
 
 .btn-small {
-    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: var(--radius);
+    background: white;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
     font-size: 0.85em;
-    font-weight: 600;
 }
 
 .btn-small:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(26, 54, 93, 0.2);
-}
-
-.btn-danger {
-    background: linear-gradient(135deg, var(--danger) 0%, #c53030 100%);
-    color: white;
-}
-
-.btn-warning {
-    background: linear-gradient(135deg, var(--warning) 0%, #c05621 100%);
-    color: white;
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--bg-elevated);
 }
 
 /* ==================== TABLAS ==================== */
@@ -562,35 +553,32 @@ button {
 }
 
 .tabla-clientes th {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    color: white;
-    padding: 16px 18px;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    padding: 16px 20px;
     text-align: left;
     font-size: 0.85em;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-}
-
-.tabla-clientes th:first-child {
-    border-radius: var(--radius) 0 0 0;
-}
-
-.tabla-clientes th:last-child {
-    border-radius: 0 var(--radius) 0 0;
+    border-bottom: 2px solid var(--border);
 }
 
 .tabla-clientes td {
-    padding: 16px 18px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+    vertical-align: middle;
 }
 
-.tabla-clientes tr:nth-child(even) {
-    background: var(--bg-main);
+.tabla-clientes tr:hover td {
+    background: var(--bg-elevated);
 }
 
-.tabla-clientes tr:hover {
-    background: rgba(26, 54, 93, 0.05);
+/* Remove gradient headers */
+.tabla-clientes th:first-child,
+.tabla-clientes th:last-child {
+    border-radius: 0;
 }
 
 /* ==================== NAVEGACIÓN LEGACY (para compatibilidad) ==================== */
@@ -2665,3 +2653,5 @@ small {
 body.dark-mode small {
     color: #a0aec0;
 }
+
+/* ==================== CRONOGRAMA & SEARCH STYLES ==================== */
