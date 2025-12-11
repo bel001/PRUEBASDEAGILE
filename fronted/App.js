@@ -1880,123 +1880,109 @@ async function abrirCaja() {
 }
 
 async function cerrarCaja() {
-    const montoReal = parseFloat(document.getElementById('monto-real-cierre').value);
-    const mensajeDiv = document.getElementById('mensaje-caja');
+    async function cerrarCaja() {
+        const montoRealInput = document.getElementById('monto-real-cierre');
+        const montoReal = parseFloat(montoRealInput.value);
+        const mensajeDiv = document.getElementById('mensaje-caja');
 
-    mensajeDiv.className = 'mensaje';
-    mensajeDiv.innerText = '';
+        mensajeDiv.className = 'mensaje';
+        mensajeDiv.innerText = '';
 
-    if (isNaN(montoReal) || montoReal < 0) {
-        alert('Por favor, ingrese el dinero físico que contó en el cajón');
-        return;
-    }
+        if (isNaN(montoReal) || montoReal < 0) {
+            alert('Por favor, ingrese el dinero físico que contó en el cajón');
+            return;
+        }
 
-    // VALIDACIÓN: No cerrar con menos del fondo inicial
-    const montoInicial = parseFloat(document.getElementById('resumen-inicial').innerText || '0');
-    if (montoReal < montoInicial) {
-        alert(`❌ No puede cerrar caja con un monto menor al Fondo Inicial (S/ ${montoInicial.toFixed(2)}).\nVerifique si falta dinero.`);
-        return;
-    }
+        // VALIDACIÓN ESTRICTA DE CUADRE
+        // Recuperar valores del reporte visible
+        const fondoCaja = parseFloat(document.getElementById('resumen-inicial').innerText || '0');
+        const ventasEfectivo = parseFloat(document.getElementById('resumen-efectivo').innerText || '0');
 
-    if (!confirm('¿Está seguro de cerrar la caja? Esta acción generará el reporte final y cerrará el turno.')) {
-        return;
-    }
+        // Total que DEBE haber en cajón (Suma de los dos componentes visibles)
+        const totalEsperado = Number((fondoCaja + ventasEfectivo).toFixed(2));
 
-    mensajeDiv.innerText = '⏳ Cerrando caja...';
+        // Permitir un margen de error mínimo por punto flotante (0.01) o ser estricto
+        // Se pide: "debe ser igual al total en efectivo"
+        if (Math.abs(montoReal - totalEsperado) > 0.01) {
+            alert(`❌ El dinero reportado (S/ ${montoReal.toFixed(2)}) NO COINCIDE con el total físico esperado (S/ ${totalEsperado.toFixed(2)}).\n\nDebe haber:\n Fondo: S/ ${fondoCaja.toFixed(2)}\n+ Ventas: S/ ${ventasEfectivo.toFixed(2)}\n= Total: S/ ${totalEsperado.toFixed(2)}\n\nVerifique su conteo o ajuste si es necesario.`);
+            return;
+        }
 
-    // LÓGICA DIRECTA: El usuario debe contar SOLO el dinero físico
-    // Ya no hacemos "magia" de restar Flow, para evitar confusiones.
+        if (!confirm(`¿El monto contado es correcto (S/ ${montoReal.toFixed(2)})?\n\nAl cerrar caja se generará el reporte final.`)) {
+            return;
+        }
 
-    // Necesitamos definir montoFisicoEsperado aunque no lo usemos para restar, por si queremos validar algo, 
-    // pero el backend hace la validación final.
-    // Solo definimos montoAEnviar como lo que ingresó el usuario.
+        mensajeDiv.innerText = '⏳ Cerrando caja...';
 
-    const montoAEnviar = montoReal;
-    const montoFlow = parseFloat(document.getElementById('resumen-flow').innerText || '0'); // Mantenemos para mostrar en log si queremos
+        try {
+            const res = await fetch(`${API_URL}/caja/cierre`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ total_real_efectivo: montoReal })
+            });
 
-    try {
-        const res = await fetch(`${API_URL}/caja/cierre`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ total_real_efectivo: montoAEnviar })
-        });
+            const data = await res.json();
 
-        const data = await res.json();
+            if (res.ok) {
+                alert('✅ Caja Cerrada y Cuadrada Exitosamente.');
 
-        if (res.ok) {
-            const diferencia = data.diferencia;
-            let msg = '✅ Caja cerrada exitosamente.\n';
+                mensajeDiv.innerText = '✅ Caja cerrada exitosamente.';
+                mensajeDiv.classList.add('exito');
 
-            if (diferencia > 0) {
-                msg += `⚠️ SOBRANTE FÍSICO: S/ ${diferencia.toFixed(2)}`;
-            } else if (diferencia < 0) {
-                msg += `❌ FALTANTE FÍSICO: S/ ${Math.abs(diferencia).toFixed(2)}`;
+                document.getElementById('monto-real-cierre').value = '';
+                cargarEstadoCaja();
+                cargarHistorialCaja();
+
+                // Ocultar sección caja abierta
+                document.getElementById('caja-abierta').style.display = 'none';
             } else {
-                msg += '✨ CAJA CUADRADA: El dinero físico coincide.';
+                mensajeDiv.innerText = `❌ Error: ${data.error}`;
+                mensajeDiv.classList.add('error');
             }
-
-            // Avisar si hubo ajuste automático
-            if (montoAEnviar !== montoReal) {
-                msg += `\n(Nota: Se descontó S/ ${montoFlow.toFixed(2)} de pagos digitales del monto ingresado para cuadrar el efectivo).`;
-            }
-
-            mostrarToast(msg, diferencia < 0 ? 'error' : 'success');
-
-            mensajeDiv.innerText = msg;
-            mensajeDiv.className = diferencia === 0 ? 'mensaje exito' : (diferencia > 0 ? 'mensaje warning' : 'mensaje error');
-            document.getElementById('monto-real-cierre').value = '';
-
-            setTimeout(() => cargarEstadoCaja(), 2000);
-
-        } else {
-            // Manejo de error del backend (probablemente restricción de cuadre estricto si existe)
-            let errorMsg = `❌ Error: ${data.error}`;
-            if (data.error && data.error.includes("cuadra")) {
-                errorMsg;
-            }
-            mensajeDiv.innerText = errorMsg;
+        } catch (error) {
+            console.error(error);
+            mensajeDiv.innerText = '❌ Error de conexión';
             mensajeDiv.classList.add('error');
         }
-    } catch (error) {
-        console.error(error);
-        mensajeDiv.innerText = '❌ Error de conexión';
-        mensajeDiv.classList.add('error');
     }
-}
 
-// Función para cargar historial de movimientos físicos en la sesión
-async function cargarHistorialCaja() {
-    const tableBody = document.getElementById('lista-movimientos-caja');
-    tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">⏳ Cargando...</td></tr>';
 
-    try {
-        const res = await fetch(`${API_URL}/caja/movimientos-sesion`);
 
-        if (res.status === 404) {
-            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px; color: #7f8c8d;">🔒 La caja está cerrada (sin historial actual)</td></tr>';
-            return;
-        }
 
-        const movimientos = await res.json();
 
-        if (movimientos.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">No hay movimientos registrados.</td></tr>';
-            return;
-        }
+    // Función para cargar historial de movimientos físicos en la sesión
+    async function cargarHistorialCaja() {
+        const tableBody = document.getElementById('lista-movimientos-caja');
+        tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">⏳ Cargando...</td></tr>';
 
-        let html = '';
-        movimientos.forEach(m => {
-            // Formatear Hora
-            const fecha = new Date(m.fecha);
-            const hora = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+        try {
+            const res = await fetch(`${API_URL}/caja/movimientos-sesion`);
 
-            // Estilos según tipo
-            const isEntrada = m.tipo === 'ENTRADA';
-            const colorMonto = isEntrada ? '#2e7d32' : '#c62828'; // Verde / Rojo
-            const icono = isEntrada ? '📥' : '📤';
-            const signo = isEntrada ? '+' : '-';
+            if (res.status === 404) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px; color: #7f8c8d;">🔒 La caja está cerrada (sin historial actual)</td></tr>';
+                return;
+            }
 
-            html += `
+            const movimientos = await res.json();
+
+            if (movimientos.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 15px;">No hay movimientos registrados.</td></tr>';
+                return;
+            }
+
+            let html = '';
+            movimientos.forEach(m => {
+                // Formatear Hora
+                const fecha = new Date(m.fecha);
+                const hora = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+
+                // Estilos según tipo
+                const isEntrada = m.tipo === 'ENTRADA';
+                const colorMonto = isEntrada ? '#2e7d32' : '#c62828'; // Verde / Rojo
+                const icono = isEntrada ? '📥' : '📤';
+                const signo = isEntrada ? '+' : '-';
+
+                html += `
                 <tr style="border-bottom: 1px solid #eee;">
                     <td style="padding: 10px;">${hora}</td>
                     <td style="padding: 10px;">${m.descripcion}</td>
@@ -2010,185 +1996,185 @@ async function cargarHistorialCaja() {
                     </td>
                 </tr>
             `;
-        });
+            });
 
-        tableBody.innerHTML = html;
+            tableBody.innerHTML = html;
 
-    } catch (error) {
-        console.error("Error cargando historial caja:", error);
-        tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: red;">❌ Error al cargar historial</td></tr>';
-    }
-}
-
-function verPrestamo(clienteId) {
-    // Cambiar a la sección de préstamos y mostrar el detalle
-    mostrarSeccion('prestamos');
-    mostrarDetallePrestamo(clienteId);
-}
-
-// ==================== MÓDULO EMPLEADOS (ELIMINADO) ====================
-// La gestión de empleados ha sido removida por solicitud.
-// Se mantiene únicamente la lógica de login con credenciales por defecto.
-
-function iniciarSesion() {
-    const usuario = document.getElementById('login-usuario').value.trim();
-    const password = document.getElementById('login-password').value;
-    const mensajeDiv = document.getElementById('login-mensaje');
-
-    mensajeDiv.innerText = '';
-
-    if (!usuario || !password) {
-        mensajeDiv.innerText = '⚠️ Ingrese usuario y contraseña';
-        return;
-    }
-
-    // Obtener empleados de localStorage (robusto ante datos corruptos)
-    let empleados = [];
-    try {
-        empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
-        if (!Array.isArray(empleados)) empleados = [];
-    } catch (e) {
-        empleados = [];
-    }
-
-    // Si no hay empleados, crear los predeterminados
-    if (empleados.length === 0) {
-        empleados = [
-            { usuario: 'cajero', password: '123', rol: 'cajero' },
-            { usuario: 'admin', password: 'admin123', rol: 'admin' },
-            { usuario: 'usuario', password: 'usuario123', rol: 'cajero' }
-        ];
-        localStorage.setItem('empleados', JSON.stringify(empleados));
-    }
-
-    // Buscar empleado
-    let empleado = empleados.find(e => e.usuario === usuario && e.password === password);
-
-    // Intento de recuperación: si no coincide, resetear lista a defaults y volver a buscar
-    if (!empleado) {
-        const credencialesDefault = [
-            { usuario: 'cajero', password: '123', rol: 'cajero' },
-            { usuario: 'admin', password: 'admin123', rol: 'admin' },
-            { usuario: 'usuario', password: 'usuario123', rol: 'cajero' }
-        ];
-        localStorage.setItem('empleados', JSON.stringify(credencialesDefault));
-        empleado = credencialesDefault.find(e => e.usuario === usuario && e.password === password);
-    }
-
-    if (empleado) {
-        // Login exitoso
-        localStorage.setItem('cajero_usuario', usuario);
-        localStorage.setItem('cajero_rol', empleado.rol);
-        mostrarAplicacion(usuario);
-    } else {
-        mensajeDiv.innerText = '⚠️ Usuario o contraseña incorrectos';
-    }
-}
-
-// ==================== HISTORIAL DE PAGOS Y ANULACIONES ====================
-async function verHistorial(cuotaId, numeroCuota, clienteNombre, clienteDoc) {
-    document.getElementById('historial-num-cuota').innerText = numeroCuota;
-    const lista = document.getElementById('historial-lista');
-    lista.innerHTML = '<p style="text-align: center; color: #666;">Cargando...</p>';
-    document.getElementById('modal-historial').style.display = 'flex';
-
-    // Guardar datos temporalmente en el modal para reuso (simple hack)
-    lista.setAttribute('data-cliente-nombre', clienteNombre);
-    lista.setAttribute('data-cliente-doc', clienteDoc);
-
-    try {
-        const res = await fetch(`${API_URL}/pagos/historial/${cuotaId}`);
-        const pagos = await res.json();
-
-        lista.innerHTML = '';
-
-        if (pagos.length === 0) {
-            lista.innerHTML = '<p style="text-align: center; color: #666;">No hay pagos registrados para esta cuota.</p>';
-            return;
+        } catch (error) {
+            console.error("Error cargando historial caja:", error);
+            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: red;">❌ Error al cargar historial</td></tr>';
         }
-
-        const rol = localStorage.getItem('cajero_rol');
-        // ... (existing code for history) ...
-    } catch (e) { console.error(e) }
-}
-
-// ==================== CRONOGRAMA DE PAGOS ====================
-async function buscarCronograma() {
-    const input = document.getElementById('buscar-cronograma-input').value.trim();
-    const mensajeDiv = document.getElementById('mensaje-cronograma');
-    const resultadoDiv = document.getElementById('cronograma-resultado');
-    const tbody = document.getElementById('lista-cronograma');
-
-    mensajeDiv.innerText = '';
-    resultadoDiv.style.display = 'none';
-    tbody.innerHTML = '';
-
-    if (!input) {
-        mostrarToast('Ingrese nombre o documento del cliente', 'warning');
-        return;
     }
 
-    mensajeDiv.innerText = '🔍 Buscando cliente...';
+    function verPrestamo(clienteId) {
+        // Cambiar a la sección de préstamos y mostrar el detalle
+        mostrarSeccion('prestamos');
+        mostrarDetallePrestamo(clienteId);
+    }
 
-    try {
-        // 1. Buscar Cliente
-        const clientesRes = await fetch(`${API_URL}/clientes`);
-        const clientes = await clientesRes.json();
-        const clienteEncontrado = clientes.find(c =>
-            c.documento === input || c.nombre.toLowerCase().includes(input.toLowerCase())
-        );
+    // ==================== MÓDULO EMPLEADOS (ELIMINADO) ====================
+    // La gestión de empleados ha sido removida por solicitud.
+    // Se mantiene únicamente la lógica de login con credenciales por defecto.
 
-        if (!clienteEncontrado) {
-            mensajeDiv.innerText = '❌ Cliente no encontrado.';
-            mensajeDiv.className = 'mensaje error';
-            return;
-        }
-
-        // 2. Buscar Préstamo Activo
-        const prestamoRes = await fetch(`${API_URL}/prestamos/cliente/${clienteEncontrado.id}`);
-        if (!prestamoRes.ok) {
-            if (prestamoRes.status === 404) {
-                mensajeDiv.innerText = 'ℹ️ El cliente no tiene préstamo activo.';
-                mensajeDiv.className = 'mensaje';
-            } else {
-                throw new Error('Error al consultar préstamo');
-            }
-            return;
-        }
-
-        const data = await prestamoRes.json();
-        const { prestamo, cuotas } = data;
+    function iniciarSesion() {
+        const usuario = document.getElementById('login-usuario').value.trim();
+        const password = document.getElementById('login-password').value;
+        const mensajeDiv = document.getElementById('login-mensaje');
 
         mensajeDiv.innerText = '';
-        resultadoDiv.style.display = 'block';
 
-        // Llenar Cabecera
-        document.getElementById('cronograma-cliente-nombre').innerText = prestamo.cliente_nombre;
-        document.getElementById('cronograma-prestamo-id').innerText = prestamo.id;
-        document.getElementById('cronograma-total-inicial').innerText = parseFloat(prestamo.monto_total).toFixed(2); // Deuda Total (Con Intereses)
+        if (!usuario || !password) {
+            mensajeDiv.innerText = '⚠️ Ingrese usuario y contraseña';
+            return;
+        }
 
-        // Mostrar TEA y TEM si existen (compatibilidad hacia atrás)
-        const tea = prestamo.tea || 0;
-        const tem = prestamo.tem || 0;
-        document.getElementById('cronograma-tea').innerText = tea;
-        document.getElementById('cronograma-tem').innerText = tem;
+        // Obtener empleados de localStorage (robusto ante datos corruptos)
+        let empleados = [];
+        try {
+            empleados = JSON.parse(localStorage.getItem('empleados') || '[]');
+            if (!Array.isArray(empleados)) empleados = [];
+        } catch (e) {
+            empleados = [];
+        }
+
+        // Si no hay empleados, crear los predeterminados
+        if (empleados.length === 0) {
+            empleados = [
+                { usuario: 'cajero', password: '123', rol: 'cajero' },
+                { usuario: 'admin', password: 'admin123', rol: 'admin' },
+                { usuario: 'usuario', password: 'usuario123', rol: 'cajero' }
+            ];
+            localStorage.setItem('empleados', JSON.stringify(empleados));
+        }
+
+        // Buscar empleado
+        let empleado = empleados.find(e => e.usuario === usuario && e.password === password);
+
+        // Intento de recuperación: si no coincide, resetear lista a defaults y volver a buscar
+        if (!empleado) {
+            const credencialesDefault = [
+                { usuario: 'cajero', password: '123', rol: 'cajero' },
+                { usuario: 'admin', password: 'admin123', rol: 'admin' },
+                { usuario: 'usuario', password: 'usuario123', rol: 'cajero' }
+            ];
+            localStorage.setItem('empleados', JSON.stringify(credencialesDefault));
+            empleado = credencialesDefault.find(e => e.usuario === usuario && e.password === password);
+        }
+
+        if (empleado) {
+            // Login exitoso
+            localStorage.setItem('cajero_usuario', usuario);
+            localStorage.setItem('cajero_rol', empleado.rol);
+            mostrarAplicacion(usuario);
+        } else {
+            mensajeDiv.innerText = '⚠️ Usuario o contraseña incorrectos';
+        }
+    }
+
+    // ==================== HISTORIAL DE PAGOS Y ANULACIONES ====================
+    async function verHistorial(cuotaId, numeroCuota, clienteNombre, clienteDoc) {
+        document.getElementById('historial-num-cuota').innerText = numeroCuota;
+        const lista = document.getElementById('historial-lista');
+        lista.innerHTML = '<p style="text-align: center; color: #666;">Cargando...</p>';
+        document.getElementById('modal-historial').style.display = 'flex';
+
+        // Guardar datos temporalmente en el modal para reuso (simple hack)
+        lista.setAttribute('data-cliente-nombre', clienteNombre);
+        lista.setAttribute('data-cliente-doc', clienteDoc);
+
+        try {
+            const res = await fetch(`${API_URL}/pagos/historial/${cuotaId}`);
+            const pagos = await res.json();
+
+            lista.innerHTML = '';
+
+            if (pagos.length === 0) {
+                lista.innerHTML = '<p style="text-align: center; color: #666;">No hay pagos registrados para esta cuota.</p>';
+                return;
+            }
+
+            const rol = localStorage.getItem('cajero_rol');
+            // ... (existing code for history) ...
+        } catch (e) { console.error(e) }
+    }
+
+    // ==================== CRONOGRAMA DE PAGOS ====================
+    async function buscarCronograma() {
+        const input = document.getElementById('buscar-cronograma-input').value.trim();
+        const mensajeDiv = document.getElementById('mensaje-cronograma');
+        const resultadoDiv = document.getElementById('cronograma-resultado');
+        const tbody = document.getElementById('lista-cronograma');
+
+        mensajeDiv.innerText = '';
+        resultadoDiv.style.display = 'none';
+        tbody.innerHTML = '';
+
+        if (!input) {
+            mostrarToast('Ingrese nombre o documento del cliente', 'warning');
+            return;
+        }
+
+        mensajeDiv.innerText = '🔍 Buscando cliente...';
+
+        try {
+            // 1. Buscar Cliente
+            const clientesRes = await fetch(`${API_URL}/clientes`);
+            const clientes = await clientesRes.json();
+            const clienteEncontrado = clientes.find(c =>
+                c.documento === input || c.nombre.toLowerCase().includes(input.toLowerCase())
+            );
+
+            if (!clienteEncontrado) {
+                mensajeDiv.innerText = '❌ Cliente no encontrado.';
+                mensajeDiv.className = 'mensaje error';
+                return;
+            }
+
+            // 2. Buscar Préstamo Activo
+            const prestamoRes = await fetch(`${API_URL}/prestamos/cliente/${clienteEncontrado.id}`);
+            if (!prestamoRes.ok) {
+                if (prestamoRes.status === 404) {
+                    mensajeDiv.innerText = 'ℹ️ El cliente no tiene préstamo activo.';
+                    mensajeDiv.className = 'mensaje';
+                } else {
+                    throw new Error('Error al consultar préstamo');
+                }
+                return;
+            }
+
+            const data = await prestamoRes.json();
+            const { prestamo, cuotas } = data;
+
+            mensajeDiv.innerText = '';
+            resultadoDiv.style.display = 'block';
+
+            // Llenar Cabecera
+            document.getElementById('cronograma-cliente-nombre').innerText = prestamo.cliente_nombre;
+            document.getElementById('cronograma-prestamo-id').innerText = prestamo.id;
+            document.getElementById('cronograma-total-inicial').innerText = parseFloat(prestamo.monto_total).toFixed(2); // Deuda Total (Con Intereses)
+
+            // Mostrar TEA y TEM si existen (compatibilidad hacia atrás)
+            const tea = prestamo.tea || 0;
+            const tem = prestamo.tem || 0;
+            document.getElementById('cronograma-tea').innerText = tea;
+            document.getElementById('cronograma-tem').innerText = tem;
 
 
-        // Llenar Tabla
-        cuotas.forEach(c => {
-            const tr = document.createElement('tr');
+            // Llenar Tabla
+            cuotas.forEach(c => {
+                const tr = document.createElement('tr');
 
-            // Estado visual
-            const estadoBadge = c.pagada ?
-                '<span class="badge-pagada">✅ Pagada</span>' :
-                '<span class="badge-pendiente">⏳ Pendiente</span>';
+                // Estado visual
+                const estadoBadge = c.pagada ?
+                    '<span class="badge-pagada">✅ Pagada</span>' :
+                    '<span class="badge-pendiente">⏳ Pendiente</span>';
 
-            // Check if we have amortization details (new loans) or fallback (old loans)
-            const interes = c.interes_calculado !== undefined ? `S/ ${c.interes_calculado.toFixed(2)}` : '-';
-            const amort = c.amortizacion_capital !== undefined ? `S/ ${c.amortizacion_capital.toFixed(2)}` : '-';
-            const saldoCap = c.saldo_capital_restante !== undefined ? `S/ ${c.saldo_capital_restante.toFixed(2)}` : '-';
+                // Check if we have amortization details (new loans) or fallback (old loans)
+                const interes = c.interes_calculado !== undefined ? `S/ ${c.interes_calculado.toFixed(2)}` : '-';
+                const amort = c.amortizacion_capital !== undefined ? `S/ ${c.amortizacion_capital.toFixed(2)}` : '-';
+                const saldoCap = c.saldo_capital_restante !== undefined ? `S/ ${c.saldo_capital_restante.toFixed(2)}` : '-';
 
-            tr.innerHTML = `
+                tr.innerHTML = `
                 <td>${c.numero_cuota}</td>
                 <td>${c.fecha_vencimiento}</td>
                 <td style="font-weight:bold;">S/ ${parseFloat(c.monto_cuota).toFixed(2)}</td>
@@ -2197,237 +2183,237 @@ async function buscarCronograma() {
                 <td>${saldoCap}</td>
                 <td>${estadoBadge}</td>
             `;
-            tbody.appendChild(tr);
+                tbody.appendChild(tr);
+            });
+
+        } catch (err) {
+            console.error(err);
+            mensajeDiv.innerText = '❌ Error al cargar cronograma.';
+            mensajeDiv.className = 'mensaje error';
+        }
+    }
+
+
+    // Función para reimpresión de comprobante
+    function reimprimirComprobante(id, monto, medio) {
+        const lista = document.getElementById('historial-lista');
+        const clienteNombre = lista.getAttribute('data-cliente-nombre');
+        const clienteDoc = lista.getAttribute('data-cliente-doc');
+
+        if (!clienteNombre) {
+            alert('❌ Error: Datos del cliente no disponibles. Recargue la página.');
+            return;
+        }
+
+        const numCuota = document.getElementById('historial-num-cuota').innerText;
+
+        // Reconstruir objeto de datos para el PDF
+        const datoPago = {
+            cliente_nombre: clienteNombre,
+            cliente_doc: clienteDoc || 'N/A',
+            numero_cuota: numCuota,
+            capital: monto,
+            mora: 0,
+            total: monto,
+            medio_pago: medio,
+            ajuste: 0,
+            comprobante_id: id
+        };
+
+        if (confirm('¿Desea volver a descargar el comprobante?')) {
+            generarComprobantePDF(datoPago);
+        }
+    }
+
+    // ==================== EXPORTACIÓN A CSV ====================
+    function exportarClientesCSV() {
+        const tabla = document.querySelector('.tabla-clientes');
+        if (!tabla) {
+            alert('No hay datos para exportar');
+            return;
+        }
+
+        let csv = [];
+        const filas = tabla.querySelectorAll('tr');
+
+        filas.forEach(fila => {
+            const celdas = fila.querySelectorAll('th, td');
+            const fila_csv = [];
+            celdas.forEach(celda => {
+                // Limpiar texto (quitar HTML y saltos de línea)
+                let texto = celda.innerText.replace(/"/g, '""').replace(/\n/g, ' ').trim();
+                fila_csv.push(`"${texto}"`);
+            });
+            csv.push(fila_csv.join(','));
         });
 
-    } catch (err) {
-        console.error(err);
-        mensajeDiv.innerText = '❌ Error al cargar cronograma.';
-        mensajeDiv.className = 'mensaje error';
-    }
-}
+        const contenido = csv.join('\n');
+        const blob = new Blob(['\ufeff' + contenido], { type: 'text/csv;charset=utf-8;' }); // BOM para Excel
+        const url = URL.createObjectURL(blob);
 
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `clientes_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
 
-// Función para reimpresión de comprobante
-function reimprimirComprobante(id, monto, medio) {
-    const lista = document.getElementById('historial-lista');
-    const clienteNombre = lista.getAttribute('data-cliente-nombre');
-    const clienteDoc = lista.getAttribute('data-cliente-doc');
-
-    if (!clienteNombre) {
-        alert('❌ Error: Datos del cliente no disponibles. Recargue la página.');
-        return;
+        mostrarToast('📄 Archivo CSV descargado', 'success');
     }
 
-    const numCuota = document.getElementById('historial-num-cuota').innerText;
+    // ==================== CONFIGURACIÓN DEL SISTEMA ====================
+    // ==================== CONFIGURACIÓN DEL SISTEMA ====================
+    function cargarConfiguracion() {
+        // Cargar mora desde localStorage (o default 1%)
+        const moraPorcentaje = localStorage.getItem('config_mora') || '1';
+        document.getElementById('config-mora-porcentaje').value = moraPorcentaje;
 
-    // Reconstruir objeto de datos para el PDF
-    const datoPago = {
-        cliente_nombre: clienteNombre,
-        cliente_doc: clienteDoc || 'N/A',
-        numero_cuota: numCuota,
-        capital: monto,
-        mora: 0,
-        total: monto,
-        medio_pago: medio,
-        ajuste: 0,
-        comprobante_id: id
-    };
+        // Mostrar info del sistema
+        document.getElementById('config-servidor-url').innerText = API_URL || window.location.origin;
+        document.getElementById('config-usuario-actual').innerText = localStorage.getItem('cajero_usuario') || '-';
+        document.getElementById('config-rol-actual').innerText = (localStorage.getItem('cajero_rol') || 'cajero').toUpperCase();
 
-    if (confirm('¿Desea volver a descargar el comprobante?')) {
-        generarComprobantePDF(datoPago);
-    }
-}
-
-// ==================== EXPORTACIÓN A CSV ====================
-function exportarClientesCSV() {
-    const tabla = document.querySelector('.tabla-clientes');
-    if (!tabla) {
-        alert('No hay datos para exportar');
-        return;
-    }
-
-    let csv = [];
-    const filas = tabla.querySelectorAll('tr');
-
-    filas.forEach(fila => {
-        const celdas = fila.querySelectorAll('th, td');
-        const fila_csv = [];
-        celdas.forEach(celda => {
-            // Limpiar texto (quitar HTML y saltos de línea)
-            let texto = celda.innerText.replace(/"/g, '""').replace(/\n/g, ' ').trim();
-            fila_csv.push(`"${texto}"`);
+        // Actualizar visualmente la fecha en el input si ya la tenemos
+        if (FECHA_SISTEMA_CACHED) {
+            document.getElementById('config-fecha-sistema').value = FECHA_SISTEMA_CACHED;
+        }
+        // Refrescarla del servidor también
+        cargarFechaSistema().then(() => {
+            const input = document.getElementById('config-fecha-sistema');
+            if (input) input.value = FECHA_SISTEMA_CACHED;
         });
-        csv.push(fila_csv.join(','));
-    });
-
-    const contenido = csv.join('\n');
-    const blob = new Blob(['\ufeff' + contenido], { type: 'text/csv;charset=utf-8;' }); // BOM para Excel
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `clientes_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-
-    mostrarToast('📄 Archivo CSV descargado', 'success');
-}
-
-// ==================== CONFIGURACIÓN DEL SISTEMA ====================
-// ==================== CONFIGURACIÓN DEL SISTEMA ====================
-function cargarConfiguracion() {
-    // Cargar mora desde localStorage (o default 1%)
-    const moraPorcentaje = localStorage.getItem('config_mora') || '1';
-    document.getElementById('config-mora-porcentaje').value = moraPorcentaje;
-
-    // Mostrar info del sistema
-    document.getElementById('config-servidor-url').innerText = API_URL || window.location.origin;
-    document.getElementById('config-usuario-actual').innerText = localStorage.getItem('cajero_usuario') || '-';
-    document.getElementById('config-rol-actual').innerText = (localStorage.getItem('cajero_rol') || 'cajero').toUpperCase();
-
-    // Actualizar visualmente la fecha en el input si ya la tenemos
-    if (FECHA_SISTEMA_CACHED) {
-        document.getElementById('config-fecha-sistema').value = FECHA_SISTEMA_CACHED;
     }
-    // Refrescarla del servidor también
-    cargarFechaSistema().then(() => {
-        const input = document.getElementById('config-fecha-sistema');
-        if (input) input.value = FECHA_SISTEMA_CACHED;
-    });
-}
 
-async function cargarFechaSistema() {
-    try {
-        const res = await fetch(`${API_URL}/config/fecha`);
-        if (res.ok) {
+    async function cargarFechaSistema() {
+        try {
+            const res = await fetch(`${API_URL}/config/fecha`);
+            if (res.ok) {
+                const data = await res.json();
+                // data.iso es la fecha del sistema en ISO
+                const serverDate = new Date(data.iso);
+                const now = new Date();
+                // Calcular offset
+                FECHA_SISTEMA_OFFSET = serverDate.getTime() - now.getTime();
+                FECHA_SISTEMA_CACHED = data.fecha; // YYYY-MM-DD
+
+                // Actualizar spans informativos si existen
+                const span = document.getElementById('fecha-servidor-actual');
+                if (span) span.innerText = data.fecha; // YYYY-MM-DD
+
+                // Forzar actualización del header si está montado
+                const headerDate = document.getElementById('header-date');
+                if (headerDate) {
+                    const hoy = obtenerFechaHoy();
+                    headerDate.innerText = hoy.toLocaleDateString('es-PE', {
+                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    });
+                }
+            }
+        } catch (e) {
+            console.error("Error cargando fecha sistema:", e);
+        }
+    }
+
+    async function guardarFechaSistema() {
+        const fechaInput = document.getElementById('config-fecha-sistema').value;
+        if (!fechaInput) return alert('Seleccione una fecha');
+
+        // Validar formato (simple)
+        if (fechaInput.length !== 10) return alert('Formato inválido');
+
+        if (!confirm(`⚠️ ¿Está seguro que desea cambiar la fecha del sistema a ${fechaInput}?\nEsto afectará la apertura de caja y moras.`)) return;
+
+        try {
+            const res = await fetch(`${API_URL}/config/fecha`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fecha: fechaInput })
+            });
+
             const data = await res.json();
-            // data.iso es la fecha del sistema en ISO
-            const serverDate = new Date(data.iso);
-            const now = new Date();
-            // Calcular offset
-            FECHA_SISTEMA_OFFSET = serverDate.getTime() - now.getTime();
-            FECHA_SISTEMA_CACHED = data.fecha; // YYYY-MM-DD
 
-            // Actualizar spans informativos si existen
-            const span = document.getElementById('fecha-servidor-actual');
-            if (span) span.innerText = data.fecha; // YYYY-MM-DD
+            if (res.ok) {
+                mostrarToast('📅 Fecha del sistema actualizada', 'success');
+                await cargarFechaSistema(); // Recarga y recalcula offset
 
-            // Forzar actualización del header si está montado
-            const headerDate = document.getElementById('header-date');
-            if (headerDate) {
-                const hoy = obtenerFechaHoy();
-                headerDate.innerText = hoy.toLocaleDateString('es-PE', {
-                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                });
+                // Recargar la página para limpiar estados dependientes de fecha anterior (opcional, pero higiénico)
+                if (confirm('Fecha actualizada. ¿Desea recargar la página para aplicar cambios en todas las vistas?')) {
+                    window.location.reload();
+                }
+            } else {
+                alert('Error: ' + data.error);
             }
+        } catch (e) {
+            console.error(e);
+            alert('Error de conexión');
         }
-    } catch (e) {
-        console.error("Error cargando fecha sistema:", e);
     }
-}
 
-async function guardarFechaSistema() {
-    const fechaInput = document.getElementById('config-fecha-sistema').value;
-    if (!fechaInput) return alert('Seleccione una fecha');
+    function guardarConfigMora() {
+        const porcentaje = parseFloat(document.getElementById('config-mora-porcentaje').value);
 
-    // Validar formato (simple)
-    if (fechaInput.length !== 10) return alert('Formato inválido');
+        if (isNaN(porcentaje) || porcentaje < 0 || porcentaje > 100) {
+            mostrarToast('❌ Ingrese un porcentaje válido (0-100)', 'error');
+            return;
+        }
 
-    if (!confirm(`⚠️ ¿Está seguro que desea cambiar la fecha del sistema a ${fechaInput}?\nEsto afectará la apertura de caja y moras.`)) return;
+        localStorage.setItem('config_mora', porcentaje.toString());
+        mostrarToast(`✅ Mora actualizada a ${porcentaje}% `, 'success');
 
-    try {
-        const res = await fetch(`${API_URL}/config/fecha`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fecha: fechaInput })
+        document.getElementById('mensaje-config').innerText = `✅ Configuración guardada.Nueva mora: ${porcentaje}% `;
+        document.getElementById('mensaje-config').classList.add('exito');
+    }
+
+    // Función helper para obtener el porcentaje de mora configurado
+    function obtenerPorcentajeMora() {
+        return parseFloat(localStorage.getItem('config_mora') || '1') / 100;
+    }
+
+    // ==================== ESTADO DE CUENTA DEL CLIENTE ====================
+    // ==================== ESTADO DE CUENTA DEL CLIENTE ====================
+    function verEstadoCuenta() {
+        if (!prestamoActivo) {
+            mostrarToast('Primero busque un cliente', 'warning');
+            return;
+        }
+
+        const { prestamo, cuotas } = prestamoActivo;
+
+        // Actualizar título
+        document.getElementById('estado-cuenta-cliente').innerText = prestamo.cliente_nombre;
+
+        // Calcular resumen
+        const cuotasPagadas = cuotas.filter(c => c.pagada).length;
+        const cuotasPendientes = cuotas.filter(c => !c.pagada).length;
+
+        // Calcular deuda TOTAL incluyendo Mora
+        const hoy = new Date().toISOString().split('T')[0];
+        let totalPendienteReal = 0;
+
+        cuotas.forEach(c => {
+            if (!c.pagada) {
+                let deudaCuota = c.saldo_pendiente;
+
+                const vencida = c.fecha_vencimiento < hoy;
+                const huboPagoParcial = (c.monto_cuota - c.saldo_pendiente) > 0.1;
+
+                if (vencida && !huboPagoParcial) {
+                    // Cálculo de Mora: Interés Compuesto 1% mensual
+                    const fechaVenc = new Date(c.fecha_vencimiento);
+                    const diasAtraso = Math.floor((new Date(hoy) - fechaVenc) / (1000 * 60 * 60 * 24));
+                    const mesesAtraso = Math.max(1, Math.ceil(diasAtraso / 30));
+
+                    // Fórmula: Total = Saldo * (1.01)^Meses
+                    const totalConMora = c.saldo_pendiente * Math.pow(1.01, mesesAtraso);
+                    const mora = totalConMora - c.saldo_pendiente;
+                    deudaCuota += mora;
+                }
+
+                totalPendienteReal += deudaCuota;
+            }
         });
 
-        const data = await res.json();
+        const estadoPrestamo = totalPendienteReal <= 0.5 ? 'Pagado' : `Pendiente - Falta pagar: S/ ${totalPendienteReal.toFixed(2)}`;
 
-        if (res.ok) {
-            mostrarToast('📅 Fecha del sistema actualizada', 'success');
-            await cargarFechaSistema(); // Recarga y recalcula offset
-
-            // Recargar la página para limpiar estados dependientes de fecha anterior (opcional, pero higiénico)
-            if (confirm('Fecha actualizada. ¿Desea recargar la página para aplicar cambios en todas las vistas?')) {
-                window.location.reload();
-            }
-        } else {
-            alert('Error: ' + data.error);
-        }
-    } catch (e) {
-        console.error(e);
-        alert('Error de conexión');
-    }
-}
-
-function guardarConfigMora() {
-    const porcentaje = parseFloat(document.getElementById('config-mora-porcentaje').value);
-
-    if (isNaN(porcentaje) || porcentaje < 0 || porcentaje > 100) {
-        mostrarToast('❌ Ingrese un porcentaje válido (0-100)', 'error');
-        return;
-    }
-
-    localStorage.setItem('config_mora', porcentaje.toString());
-    mostrarToast(`✅ Mora actualizada a ${porcentaje}% `, 'success');
-
-    document.getElementById('mensaje-config').innerText = `✅ Configuración guardada.Nueva mora: ${porcentaje}% `;
-    document.getElementById('mensaje-config').classList.add('exito');
-}
-
-// Función helper para obtener el porcentaje de mora configurado
-function obtenerPorcentajeMora() {
-    return parseFloat(localStorage.getItem('config_mora') || '1') / 100;
-}
-
-// ==================== ESTADO DE CUENTA DEL CLIENTE ====================
-// ==================== ESTADO DE CUENTA DEL CLIENTE ====================
-function verEstadoCuenta() {
-    if (!prestamoActivo) {
-        mostrarToast('Primero busque un cliente', 'warning');
-        return;
-    }
-
-    const { prestamo, cuotas } = prestamoActivo;
-
-    // Actualizar título
-    document.getElementById('estado-cuenta-cliente').innerText = prestamo.cliente_nombre;
-
-    // Calcular resumen
-    const cuotasPagadas = cuotas.filter(c => c.pagada).length;
-    const cuotasPendientes = cuotas.filter(c => !c.pagada).length;
-
-    // Calcular deuda TOTAL incluyendo Mora
-    const hoy = new Date().toISOString().split('T')[0];
-    let totalPendienteReal = 0;
-
-    cuotas.forEach(c => {
-        if (!c.pagada) {
-            let deudaCuota = c.saldo_pendiente;
-
-            const vencida = c.fecha_vencimiento < hoy;
-            const huboPagoParcial = (c.monto_cuota - c.saldo_pendiente) > 0.1;
-
-            if (vencida && !huboPagoParcial) {
-                // Cálculo de Mora: Interés Compuesto 1% mensual
-                const fechaVenc = new Date(c.fecha_vencimiento);
-                const diasAtraso = Math.floor((new Date(hoy) - fechaVenc) / (1000 * 60 * 60 * 24));
-                const mesesAtraso = Math.max(1, Math.ceil(diasAtraso / 30));
-
-                // Fórmula: Total = Saldo * (1.01)^Meses
-                const totalConMora = c.saldo_pendiente * Math.pow(1.01, mesesAtraso);
-                const mora = totalConMora - c.saldo_pendiente;
-                deudaCuota += mora;
-            }
-
-            totalPendienteReal += deudaCuota;
-        }
-    });
-
-    const estadoPrestamo = totalPendienteReal <= 0.5 ? 'Pagado' : `Pendiente - Falta pagar: S/ ${totalPendienteReal.toFixed(2)}`;
-
-    document.getElementById('estado-cuenta-resumen').innerHTML = `
+        document.getElementById('estado-cuenta-resumen').innerHTML = `
         <div style="display: flex; justify-content: space-around; text-align: center;">
             <div>
                 <div style="font-size: 2em; font-weight: bold; color: #27ae60;">${cuotasPagadas}</div>
@@ -2445,128 +2431,128 @@ function verEstadoCuenta() {
         <div style="margin-top:8px; text-align:center; font-weight:bold; color:${totalPendienteReal <= 0.5 ? '#27ae60' : '#e67e22'};">${estadoPrestamo}</div>
     `;
 
-    // Llenar tabla
-    // Llenar tabla
-    /* TABLA RESUMEN OCULTA POR SOLICITUD
-    const tbody = document.getElementById('estado-cuenta-lista');
-    tbody.innerHTML = '';
-    */
+        // Llenar tabla
+        // Llenar tabla
+        /* TABLA RESUMEN OCULTA POR SOLICITUD
+        const tbody = document.getElementById('estado-cuenta-lista');
+        tbody.innerHTML = '';
+        */
 
-    // Obtener pagos con seguridad
-    const pagos = prestamoActivo.pagos || [];
+        // Obtener pagos con seguridad
+        const pagos = prestamoActivo.pagos || [];
 
-    /*
-        cuotas.forEach(cuota => {
-            const vencida = cuota.fecha_vencimiento < hoy && !cuota.pagada;
-            let estado = '';
-            let detalle = '';
-    
-            const esParcial = !cuota.pagada && cuota.saldo_pendiente < cuota.monto_cuota;
-    
-            if (cuota.pagada) {
-                estado = '<span style="color: #27ae60; font-weight: bold;">✅ PAGADA</span>';
-                detalle = 'A tiempo';
-            } else if (vencida) {
-                const fechaVenc = new Date(cuota.fecha_vencimiento);
-                const diasAtraso = Math.floor((new Date(hoy) - fechaVenc) / (1000 * 60 * 60 * 24));
-                const mesesAtraso = Math.max(1, Math.ceil(diasAtraso / 30));
-    
-                // Ver si aplica mora
-                const huboPagoParcial = (cuota.monto_cuota - cuota.saldo_pendiente) > 0.1;
-                let moraMonto = 0;
-                if (!huboPagoParcial) {
-                    const totalConMora = cuota.saldo_pendiente * Math.pow(1.01, mesesAtraso);
-                    moraMonto = totalConMora - cuota.saldo_pendiente;
-                }
-    
-                estado = `<span style="color: #e74c3c; font-weight: bold;">🔴 VENCIDA</span>`;
-    
-                if (moraMonto > 0) {
-                    detalle = `${diasAtraso} días atraso. <br><span style="color:#d35400">+ S/ ${moraMonto.toFixed(2)} Mora (${mesesAtraso} meses)</span>`;
+        /*
+            cuotas.forEach(cuota => {
+                const vencida = cuota.fecha_vencimiento < hoy && !cuota.pagada;
+                let estado = '';
+                let detalle = '';
+        
+                const esParcial = !cuota.pagada && cuota.saldo_pendiente < cuota.monto_cuota;
+        
+                if (cuota.pagada) {
+                    estado = '<span style="color: #27ae60; font-weight: bold;">✅ PAGADA</span>';
+                    detalle = 'A tiempo';
+                } else if (vencida) {
+                    const fechaVenc = new Date(cuota.fecha_vencimiento);
+                    const diasAtraso = Math.floor((new Date(hoy) - fechaVenc) / (1000 * 60 * 60 * 24));
+                    const mesesAtraso = Math.max(1, Math.ceil(diasAtraso / 30));
+        
+                    // Ver si aplica mora
+                    const huboPagoParcial = (cuota.monto_cuota - cuota.saldo_pendiente) > 0.1;
+                    let moraMonto = 0;
+                    if (!huboPagoParcial) {
+                        const totalConMora = cuota.saldo_pendiente * Math.pow(1.01, mesesAtraso);
+                        moraMonto = totalConMora - cuota.saldo_pendiente;
+                    }
+        
+                    estado = `<span style="color: #e74c3c; font-weight: bold;">🔴 VENCIDA</span>`;
+        
+                    if (moraMonto > 0) {
+                        detalle = `${diasAtraso} días atraso. <br><span style="color:#d35400">+ S/ ${moraMonto.toFixed(2)} Mora (${mesesAtraso} meses)</span>`;
+                    } else {
+                        detalle = `${diasAtraso} días atraso (Mora exonerada)`;
+                    }
+        
+                } else if (esParcial) {
+                    estado = '<span style="color: #e67e22; font-weight: bold;">📉 PARCIAL</span>';
+                    detalle = `Falta S/ ${cuota.saldo_pendiente.toFixed(2)}`;
                 } else {
-                    detalle = `${diasAtraso} días atraso (Mora exonerada)`;
+                    estado = '<span style="color: #f39c12;">⏳ Pendiente</span>';
+                    detalle = 'Por vencer';
                 }
-    
-            } else if (esParcial) {
-                estado = '<span style="color: #e67e22; font-weight: bold;">📉 PARCIAL</span>';
-                detalle = `Falta S/ ${cuota.saldo_pendiente.toFixed(2)}`;
-            } else {
-                estado = '<span style="color: #f39c12;">⏳ Pendiente</span>';
-                detalle = 'Por vencer';
-            }
-    
-            // BÓTON DE DESCARGA
-            let btnDescarga = '';
-            if (cuota.pagada) {
-                // Buscar pago asociado (priorizar el aprobado/completado)
-                const pagoAsociado = pagos.find(p => p.cuota_id === cuota.id && (p.estado === 'APROBADO' || !p.estado));
-    
-                if (pagoAsociado) {
-                    // Escapamos datos para el onclick
-                    const pagoId = pagoAsociado.id;
-                    const monto = pagoAsociado.monto_pagado;
-                    const medio = pagoAsociado.medio_pago;
-    
-                    btnDescarga = `
-                        <button class="btn-small" style="background:#3498db; margin-left:5px;"
-                            onclick="descargarComprobanteEstadoCuenta('${pagoId}', ${cuota.numero_cuota}, ${monto}, '${medio}')"
-                            title="Descargar Comprobante">
-                            📄
-                        </button>
-                    `;
-                } else {
-                    // Si no se encuentra el pago específico (migración antigua), intentar usar datos genéricos
-                    btnDescarga = `<span style="font-size:0.8em; color:#999;">(Sin Recibo)</span>`;
+        
+                // BÓTON DE DESCARGA
+                let btnDescarga = '';
+                if (cuota.pagada) {
+                    // Buscar pago asociado (priorizar el aprobado/completado)
+                    const pagoAsociado = pagos.find(p => p.cuota_id === cuota.id && (p.estado === 'APROBADO' || !p.estado));
+        
+                    if (pagoAsociado) {
+                        // Escapamos datos para el onclick
+                        const pagoId = pagoAsociado.id;
+                        const monto = pagoAsociado.monto_pagado;
+                        const medio = pagoAsociado.medio_pago;
+        
+                        btnDescarga = `
+                            <button class="btn-small" style="background:#3498db; margin-left:5px;"
+                                onclick="descargarComprobanteEstadoCuenta('${pagoId}', ${cuota.numero_cuota}, ${monto}, '${medio}')"
+                                title="Descargar Comprobante">
+                                📄
+                            </button>
+                        `;
+                    } else {
+                        // Si no se encuentra el pago específico (migración antigua), intentar usar datos genéricos
+                        btnDescarga = `<span style="font-size:0.8em; color:#999;">(Sin Recibo)</span>`;
+                    }
                 }
-            }
-    
-            const row = document.createElement('tr');
-            if (vencida) row.style.backgroundColor = '#ffebee';
-            if (cuota.pagada) row.style.backgroundColor = '#e8f5e9';
-    
-            row.innerHTML = `
-                <td>${cuota.fecha_vencimiento}</td>
-                <td>Cuota ${cuota.numero_cuota}</td>
-                <td>S/ ${parseFloat(cuota.monto_cuota).toFixed(2)}</td>
-                <td>${estado} ${btnDescarga}</td>
-                <td>${detalle}</td>
-            `;
-            tbody.appendChild(row);
-        });
-    */
+        
+                const row = document.createElement('tr');
+                if (vencida) row.style.backgroundColor = '#ffebee';
+                if (cuota.pagada) row.style.backgroundColor = '#e8f5e9';
+        
+                row.innerHTML = `
+                    <td>${cuota.fecha_vencimiento}</td>
+                    <td>Cuota ${cuota.numero_cuota}</td>
+                    <td>S/ ${parseFloat(cuota.monto_cuota).toFixed(2)}</td>
+                    <td>${estado} ${btnDescarga}</td>
+                    <td>${detalle}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        */
 
-    document.getElementById('modal-estado-cuenta').style.display = 'flex';
+        document.getElementById('modal-estado-cuenta').style.display = 'flex';
 
-    // ==================== POBLAR HISTORIAL DE PAGOS (NUEVA TABLA) ====================
-    const tbodyPagos = document.getElementById('estado-cuenta-pagos-lista');
-    tbodyPagos.innerHTML = '';
+        // ==================== POBLAR HISTORIAL DE PAGOS (NUEVA TABLA) ====================
+        const tbodyPagos = document.getElementById('estado-cuenta-pagos-lista');
+        tbodyPagos.innerHTML = '';
 
-    if (pagos.length === 0) {
-        tbodyPagos.innerHTML = '<tr><td colspan="5" style="text-align:center;">No hay pagos registrados aún.</td></tr>';
-    } else {
-        // Ordenar pagos por fecha (más reciente primero)
-        const pagosOrdenados = [...pagos].sort((a, b) => new Date(b.fecha_pago) - new Date(a.fecha_pago));
+        if (pagos.length === 0) {
+            tbodyPagos.innerHTML = '<tr><td colspan="5" style="text-align:center;">No hay pagos registrados aún.</td></tr>';
+        } else {
+            // Ordenar pagos por fecha (más reciente primero)
+            const pagosOrdenados = [...pagos].sort((a, b) => new Date(b.fecha_pago) - new Date(a.fecha_pago));
 
-        pagosOrdenados.forEach(p => {
-            // Solo mostrar pagos completados/aprobados
-            if (p.estado && p.estado !== 'APROBADO' && p.estado !== 'COMPLETADO') return;
+            pagosOrdenados.forEach(p => {
+                // Solo mostrar pagos completados/aprobados
+                if (p.estado && p.estado !== 'APROBADO' && p.estado !== 'COMPLETADO') return;
 
-            // Buscar número de cuota asociada
-            const cuotaAssoc = cuotas.find(c => c.id === p.cuota_id);
-            const numCuota = cuotaAssoc ? cuotaAssoc.numero_cuota : 'N/A';
+                // Buscar número de cuota asociada
+                const cuotaAssoc = cuotas.find(c => c.id === p.cuota_id);
+                const numCuota = cuotaAssoc ? cuotaAssoc.numero_cuota : 'N/A';
 
-            const fila = document.createElement('tr');
+                const fila = document.createElement('tr');
 
-            // Formatear fecha
-            const fechaFmt = new Date(p.fecha_pago).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                // Formatear fecha
+                const fechaFmt = new Date(p.fecha_pago).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-            let btnAction = `descargarComprobanteEstadoCuenta('${p.id}', ${numCuota}, ${p.monto_pagado}, '${p.medio_pago}')`;
+                let btnAction = `descargarComprobanteEstadoCuenta('${p.id}', ${numCuota}, ${p.monto_pagado}, '${p.medio_pago}')`;
 
-            if (p.comprobante_url) {
-                btnAction = `window.open('${p.comprobante_url}', '_blank')`;
-            }
+                if (p.comprobante_url) {
+                    btnAction = `window.open('${p.comprobante_url}', '_blank')`;
+                }
 
-            fila.innerHTML = `
+                fila.innerHTML = `
                 <td>${fechaFmt}</td>
                 <td>Cuota ${numCuota}</td>
                 <td style="font-weight:bold; color:#2c3e50;">S/ ${parseFloat(p.monto_pagado).toFixed(2)}</td>
@@ -2579,238 +2565,238 @@ function verEstadoCuenta() {
                     </button>
                 </td>
              `;
-            tbodyPagos.appendChild(fila);
-        });
-    }
-}
-
-function descargarComprobanteEstadoCuenta(pagoId, numCuota, monto, medio) {
-    if (!prestamoActivo) return;
-
-    const datoPago = {
-        cliente_nombre: prestamoActivo.prestamo.cliente_nombre,
-        cliente_doc: prestamoActivo.prestamo.cliente_documento || 'N/A',
-        cliente_direccion: prestamoActivo.prestamo.cliente_direccion || '', // Si existe
-        numero_cuota: numCuota,
-        capital: monto,
-        mora: 0, // En estado de cuenta global no tenemos el detalle historico exacto de mora facilmente aqui, asumimos 0 o total
-        total: monto,
-        medio_pago: medio,
-        comprobante_id: pagoId
-    };
-
-    generarComprobantePDF(datoPago);
-}
-
-function cerrarEstadoCuenta() {
-    document.getElementById('modal-estado-cuenta').style.display = 'none';
-}
-
-// ==================== BÚSQUEDA GLOBAL ====================
-let searchTimeout;
-async function buscarGlobal(query) {
-    const resultados = document.getElementById('resultados-busqueda');
-
-    if (query.length < 2) {
-        resultados.style.display = 'none';
-        return;
+                tbodyPagos.appendChild(fila);
+            });
+        }
     }
 
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(async () => {
-        try {
-            const res = await fetch(`${API_URL}/clientes`);
-            if (!res.ok) return;
+    function descargarComprobanteEstadoCuenta(pagoId, numCuota, monto, medio) {
+        if (!prestamoActivo) return;
 
-            const clientes = await res.json();
-            const termino = query.toLowerCase();
+        const datoPago = {
+            cliente_nombre: prestamoActivo.prestamo.cliente_nombre,
+            cliente_doc: prestamoActivo.prestamo.cliente_documento || 'N/A',
+            cliente_direccion: prestamoActivo.prestamo.cliente_direccion || '', // Si existe
+            numero_cuota: numCuota,
+            capital: monto,
+            mora: 0, // En estado de cuenta global no tenemos el detalle historico exacto de mora facilmente aqui, asumimos 0 o total
+            total: monto,
+            medio_pago: medio,
+            comprobante_id: pagoId
+        };
 
-            const coincidencias = clientes.filter(c =>
-                c.nombre.toLowerCase().includes(termino) ||
-                c.documento.includes(termino) ||
-                (c.telefono && c.telefono.includes(termino))
-            ).slice(0, 8);
+        generarComprobantePDF(datoPago);
+    }
 
-            if (coincidencias.length === 0) {
-                resultados.innerHTML = '<div class="search-result-item">No se encontraron resultados</div>';
-            } else {
-                resultados.innerHTML = coincidencias.map(c => `
+    function cerrarEstadoCuenta() {
+        document.getElementById('modal-estado-cuenta').style.display = 'none';
+    }
+
+    // ==================== BÚSQUEDA GLOBAL ====================
+    let searchTimeout;
+    async function buscarGlobal(query) {
+        const resultados = document.getElementById('resultados-busqueda');
+
+        if (query.length < 2) {
+            resultados.style.display = 'none';
+            return;
+        }
+
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(async () => {
+            try {
+                const res = await fetch(`${API_URL}/clientes`);
+                if (!res.ok) return;
+
+                const clientes = await res.json();
+                const termino = query.toLowerCase();
+
+                const coincidencias = clientes.filter(c =>
+                    c.nombre.toLowerCase().includes(termino) ||
+                    c.documento.includes(termino) ||
+                    (c.telefono && c.telefono.includes(termino))
+                ).slice(0, 8);
+
+                if (coincidencias.length === 0) {
+                    resultados.innerHTML = '<div class="search-result-item">No se encontraron resultados</div>';
+                } else {
+                    resultados.innerHTML = coincidencias.map(c => `
                     <div class="search-result-item" onclick="irACliente('${c.id}')">
                         <span class="search-result-type">Cliente</span>
                         <strong>${c.nombre}</strong> - ${c.documento}
                     </div>
                 `).join('');
+                }
+
+                resultados.style.display = 'block';
+            } catch (err) {
+                console.error('Error en búsqueda:', err);
             }
+        }, 300);
+    }
 
-            resultados.style.display = 'block';
-        } catch (err) {
-            console.error('Error en búsqueda:', err);
-        }
-    }, 300);
-}
-
-function irACliente(clienteId) {
-    document.getElementById('resultados-busqueda').style.display = 'none';
-    document.getElementById('busqueda-global').value = '';
-    mostrarSeccion('clientes');
-    // Resaltar el cliente encontrado
-    setTimeout(() => {
-        const fila = document.querySelector(`tr[data-cliente-id="${clienteId}"]`);
-        if (fila) {
-            fila.style.background = 'rgba(214, 158, 46, 0.3)';
-            fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setTimeout(() => fila.style.background = '', 2000);
-        }
-    }, 500);
-}
-
-// Cerrar búsqueda al hacer clic fuera
-document.addEventListener('click', (e) => {
-    const searchBox = document.querySelector('.search-global');
-    if (searchBox && !searchBox.contains(e.target)) {
+    function irACliente(clienteId) {
         document.getElementById('resultados-busqueda').style.display = 'none';
-    }
-});
-
-// ==================== MODO OSCURO ====================
-function toggleDarkMode() {
-    document.body.classList.toggle('dark-mode');
-    const icon = document.getElementById('dark-mode-icon');
-    const isDark = document.body.classList.contains('dark-mode');
-
-    icon.innerText = isDark ? '☀️' : '🌙';
-    localStorage.setItem('darkMode', isDark ? 'true' : 'false');
-}
-
-// Cargar preferencia de modo oscuro al iniciar
-if (localStorage.getItem('darkMode') === 'true') {
-    document.body.classList.add('dark-mode');
-    const icon = document.getElementById('dark-mode-icon');
-    if (icon) icon.innerText = '☀️';
-}
-
-// ==================== CALENDARIO ====================
-let calendarioFechaActual = new Date();
-let vencimientosCalendario = {};
-
-async function cargarCalendario() {
-    const grid = document.getElementById('calendario-grid');
-    if (!grid) return;
-
-    const año = calendarioFechaActual.getFullYear();
-    const mes = calendarioFechaActual.getMonth();
-
-    // Actualizar título del mes
-    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    document.getElementById('calendario-mes-actual').innerText = `${meses[mes]} ${año}`;
-
-    // Cargar vencimientos del mes
-    await cargarVencimientosMes(año, mes);
-
-    // Generar calendario
-    const primerDia = new Date(año, mes, 1);
-    const ultimoDia = new Date(año, mes + 1, 0);
-    const diasEnMes = ultimoDia.getDate();
-    const primerDiaSemana = primerDia.getDay();
-
-    const hoy = new Date();
-    const hoyStr = hoy.toISOString().split('T')[0];
-
-    let html = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d =>
-        `<div class="calendario-header">${d}</div>`
-    ).join('');
-
-    // Días vacíos al inicio
-    for (let i = 0; i < primerDiaSemana; i++) {
-        html += '<div class="calendario-dia otro-mes"></div>';
+        document.getElementById('busqueda-global').value = '';
+        mostrarSeccion('clientes');
+        // Resaltar el cliente encontrado
+        setTimeout(() => {
+            const fila = document.querySelector(`tr[data-cliente-id="${clienteId}"]`);
+            if (fila) {
+                fila.style.background = 'rgba(214, 158, 46, 0.3)';
+                fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => fila.style.background = '', 2000);
+            }
+        }, 500);
     }
 
-    // Días del mes
-    for (let dia = 1; dia <= diasEnMes; dia++) {
-        const fechaStr = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-        const esHoy = fechaStr === hoyStr;
-        const venc = vencimientosCalendario[fechaStr] || [];
-        const tieneVencimientos = venc.length > 0;
-        const vencidos = venc.some(v => v.vencido);
+    // Cerrar búsqueda al hacer clic fuera
+    document.addEventListener('click', (e) => {
+        const searchBox = document.querySelector('.search-global');
+        if (searchBox && !searchBox.contains(e.target)) {
+            document.getElementById('resultados-busqueda').style.display = 'none';
+        }
+    });
 
-        let clases = 'calendario-dia';
-        if (esHoy) clases += ' hoy';
-        if (tieneVencimientos && vencidos) clases += ' vencidos';
-        else if (tieneVencimientos) clases += ' con-vencimientos';
+    // ==================== MODO OSCURO ====================
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark-mode');
+        const icon = document.getElementById('dark-mode-icon');
+        const isDark = document.body.classList.contains('dark-mode');
 
-        html += `
+        icon.innerText = isDark ? '☀️' : '🌙';
+        localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+    }
+
+    // Cargar preferencia de modo oscuro al iniciar
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+        const icon = document.getElementById('dark-mode-icon');
+        if (icon) icon.innerText = '☀️';
+    }
+
+    // ==================== CALENDARIO ====================
+    let calendarioFechaActual = new Date();
+    let vencimientosCalendario = {};
+
+    async function cargarCalendario() {
+        const grid = document.getElementById('calendario-grid');
+        if (!grid) return;
+
+        const año = calendarioFechaActual.getFullYear();
+        const mes = calendarioFechaActual.getMonth();
+
+        // Actualizar título del mes
+        const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        document.getElementById('calendario-mes-actual').innerText = `${meses[mes]} ${año}`;
+
+        // Cargar vencimientos del mes
+        await cargarVencimientosMes(año, mes);
+
+        // Generar calendario
+        const primerDia = new Date(año, mes, 1);
+        const ultimoDia = new Date(año, mes + 1, 0);
+        const diasEnMes = ultimoDia.getDate();
+        const primerDiaSemana = primerDia.getDay();
+
+        const hoy = new Date();
+        const hoyStr = hoy.toISOString().split('T')[0];
+
+        let html = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d =>
+            `<div class="calendario-header">${d}</div>`
+        ).join('');
+
+        // Días vacíos al inicio
+        for (let i = 0; i < primerDiaSemana; i++) {
+            html += '<div class="calendario-dia otro-mes"></div>';
+        }
+
+        // Días del mes
+        for (let dia = 1; dia <= diasEnMes; dia++) {
+            const fechaStr = `${año}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+            const esHoy = fechaStr === hoyStr;
+            const venc = vencimientosCalendario[fechaStr] || [];
+            const tieneVencimientos = venc.length > 0;
+            const vencidos = venc.some(v => v.vencido);
+
+            let clases = 'calendario-dia';
+            if (esHoy) clases += ' hoy';
+            if (tieneVencimientos && vencidos) clases += ' vencidos';
+            else if (tieneVencimientos) clases += ' con-vencimientos';
+
+            html += `
             <div class="${clases}" onclick="mostrarVencimientosDia('${fechaStr}')">
                 <span class="num-dia">${dia}</span>
                 ${tieneVencimientos ? `<span class="num-vencimientos">${venc.length}</span>` : ''}
             </div>
         `;
-    }
-
-    grid.innerHTML = html;
-}
-
-async function cargarVencimientosMes(año, mes) {
-    vencimientosCalendario = {};
-
-    try {
-        const res = await fetch(`${API_URL}/clientes`);
-        if (!res.ok) return;
-
-        const clientes = await res.json();
-        const hoy = new Date().toISOString().split('T')[0];
-
-        for (const cliente of clientes) {
-            const prestamoRes = await fetch(`${API_URL}/prestamos/cliente/${cliente.id}`);
-            if (!prestamoRes.ok) continue;
-
-            const data = await prestamoRes.json();
-            if (!data.cuotas) continue;
-
-            data.cuotas.forEach(cuota => {
-                if (cuota.pagada) return;
-
-                const fechaVenc = cuota.fecha_vencimiento;
-                const [cAño, cMes] = fechaVenc.split('-').map(Number);
-
-                if (cAño === año && cMes - 1 === mes) {
-                    if (!vencimientosCalendario[fechaVenc]) {
-                        vencimientosCalendario[fechaVenc] = [];
-                    }
-                    vencimientosCalendario[fechaVenc].push({
-                        cliente: cliente.nombre,
-                        clienteId: cliente.id,
-                        telefono: cliente.telefono,
-                        cuota: cuota.numero_cuota,
-                        monto: cuota.saldo_pendiente,
-                        vencido: fechaVenc < hoy
-                    });
-                }
-            });
         }
-    } catch (err) {
-        console.error('Error cargando vencimientos:', err);
-    }
-}
 
-function cambiarMesCalendario(delta) {
-    calendarioFechaActual.setMonth(calendarioFechaActual.getMonth() + delta);
-    cargarCalendario();
-}
-
-function mostrarVencimientosDia(fecha) {
-    const venc = vencimientosCalendario[fecha] || [];
-    const container = document.getElementById('vencimientos-dia');
-    const titulo = document.getElementById('vencimientos-dia-titulo');
-    const lista = document.getElementById('lista-vencimientos-dia');
-
-    if (venc.length === 0) {
-        container.style.display = 'none';
-        return;
+        grid.innerHTML = html;
     }
 
-    titulo.innerText = `Vencimientos del ${fecha}`;
-    lista.innerHTML = venc.map(v => `
+    async function cargarVencimientosMes(año, mes) {
+        vencimientosCalendario = {};
+
+        try {
+            const res = await fetch(`${API_URL}/clientes`);
+            if (!res.ok) return;
+
+            const clientes = await res.json();
+            const hoy = new Date().toISOString().split('T')[0];
+
+            for (const cliente of clientes) {
+                const prestamoRes = await fetch(`${API_URL}/prestamos/cliente/${cliente.id}`);
+                if (!prestamoRes.ok) continue;
+
+                const data = await prestamoRes.json();
+                if (!data.cuotas) continue;
+
+                data.cuotas.forEach(cuota => {
+                    if (cuota.pagada) return;
+
+                    const fechaVenc = cuota.fecha_vencimiento;
+                    const [cAño, cMes] = fechaVenc.split('-').map(Number);
+
+                    if (cAño === año && cMes - 1 === mes) {
+                        if (!vencimientosCalendario[fechaVenc]) {
+                            vencimientosCalendario[fechaVenc] = [];
+                        }
+                        vencimientosCalendario[fechaVenc].push({
+                            cliente: cliente.nombre,
+                            clienteId: cliente.id,
+                            telefono: cliente.telefono,
+                            cuota: cuota.numero_cuota,
+                            monto: cuota.saldo_pendiente,
+                            vencido: fechaVenc < hoy
+                        });
+                    }
+                });
+            }
+        } catch (err) {
+            console.error('Error cargando vencimientos:', err);
+        }
+    }
+
+    function cambiarMesCalendario(delta) {
+        calendarioFechaActual.setMonth(calendarioFechaActual.getMonth() + delta);
+        cargarCalendario();
+    }
+
+    function mostrarVencimientosDia(fecha) {
+        const venc = vencimientosCalendario[fecha] || [];
+        const container = document.getElementById('vencimientos-dia');
+        const titulo = document.getElementById('vencimientos-dia-titulo');
+        const lista = document.getElementById('lista-vencimientos-dia');
+
+        if (venc.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        titulo.innerText = `Vencimientos del ${fecha}`;
+        lista.innerHTML = venc.map(v => `
         <div style="padding: 12px; border-left: 3px solid ${v.vencido ? 'var(--danger)' : 'var(--warning)'}; 
                     margin-bottom: 10px; background: var(--bg-main); border-radius: 4px;">
             <strong>${v.cliente}</strong> - Cuota ${v.cuota}<br>
@@ -2826,61 +2812,61 @@ function mostrarVencimientosDia(fecha) {
         </div>
     `).join('');
 
-    container.style.display = 'block';
-}
+        container.style.display = 'block';
+    }
 
-// ==================== RECORDATORIOS MASIVOS ====================
-async function enviarRecordatoriosMasivos() {
-    const mensaje = document.getElementById('mensaje-recordatorios');
-    mensaje.innerText = '⏳ Buscando clientes morosos...';
-    mensaje.className = 'mensaje';
+    // ==================== RECORDATORIOS MASIVOS ====================
+    async function enviarRecordatoriosMasivos() {
+        const mensaje = document.getElementById('mensaje-recordatorios');
+        mensaje.innerText = '⏳ Buscando clientes morosos...';
+        mensaje.className = 'mensaje';
 
-    try {
-        const res = await fetch(`${API_URL}/clientes`);
-        if (!res.ok) throw new Error('Error cargando clientes');
+        try {
+            const res = await fetch(`${API_URL}/clientes`);
+            if (!res.ok) throw new Error('Error cargando clientes');
 
-        const clientes = await res.json();
-        const hoy = new Date().toISOString().split('T')[0];
-        let morosos = [];
+            const clientes = await res.json();
+            const hoy = new Date().toISOString().split('T')[0];
+            let morosos = [];
 
-        for (const cliente of clientes) {
-            if (!cliente.telefono) continue;
+            for (const cliente of clientes) {
+                if (!cliente.telefono) continue;
 
-            const prestamoRes = await fetch(`${API_URL}/prestamos/cliente/${cliente.id}`);
-            if (!prestamoRes.ok) continue;
+                const prestamoRes = await fetch(`${API_URL}/prestamos/cliente/${cliente.id}`);
+                if (!prestamoRes.ok) continue;
 
-            const data = await prestamoRes.json();
-            if (!data.cuotas) continue;
+                const data = await prestamoRes.json();
+                if (!data.cuotas) continue;
 
-            const cuotasVencidas = data.cuotas.filter(c => !c.pagada && c.fecha_vencimiento < hoy);
-            if (cuotasVencidas.length > 0) {
-                const totalDeuda = cuotasVencidas.reduce((sum, c) => sum + c.saldo_pendiente, 0);
-                morosos.push({
-                    nombre: cliente.nombre,
-                    telefono: cliente.telefono,
-                    cuotas: cuotasVencidas.length,
-                    deuda: totalDeuda
-                });
+                const cuotasVencidas = data.cuotas.filter(c => !c.pagada && c.fecha_vencimiento < hoy);
+                if (cuotasVencidas.length > 0) {
+                    const totalDeuda = cuotasVencidas.reduce((sum, c) => sum + c.saldo_pendiente, 0);
+                    morosos.push({
+                        nombre: cliente.nombre,
+                        telefono: cliente.telefono,
+                        cuotas: cuotasVencidas.length,
+                        deuda: totalDeuda
+                    });
+                }
             }
-        }
 
-        if (morosos.length === 0) {
-            mensaje.innerText = '✅ No hay clientes morosos para notificar';
-            mensaje.classList.add('exito');
-            return;
-        }
+            if (morosos.length === 0) {
+                mensaje.innerText = '✅ No hay clientes morosos para notificar';
+                mensaje.classList.add('exito');
+                return;
+            }
 
-        // Generar links de WhatsApp para cada moroso
-        const links = morosos.map(m => {
-            const texto = encodeURIComponent(
-                `Estimado(a) ${m.nombre}, le recordamos que tiene ${m.cuotas} cuota(s) pendiente(s) ` +
-                `por un total de S/ ${m.deuda.toFixed(2)}. Por favor acérquese a regularizar su situación. ` +
-                `Gracias - Capital Rise Loans`
-            );
-            return `https://wa.me/51${m.telefono}?text=${texto}`;
-        });
+            // Generar links de WhatsApp para cada moroso
+            const links = morosos.map(m => {
+                const texto = encodeURIComponent(
+                    `Estimado(a) ${m.nombre}, le recordamos que tiene ${m.cuotas} cuota(s) pendiente(s) ` +
+                    `por un total de S/ ${m.deuda.toFixed(2)}. Por favor acérquese a regularizar su situación. ` +
+                    `Gracias - Capital Rise Loans`
+                );
+                return `https://wa.me/51${m.telefono}?text=${texto}`;
+            });
 
-        mensaje.innerHTML = `
+            mensaje.innerHTML = `
             <p>📱 Se encontraron <strong>${morosos.length}</strong> clientes morosos:</p>
             <div style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
                 ${morosos.map((m, i) => `
@@ -2891,195 +2877,201 @@ async function enviarRecordatoriosMasivos() {
                 `).join('')}
             </div>
         `;
-        mensaje.classList.add('exito');
+            mensaje.classList.add('exito');
 
-    } catch (err) {
-        console.error('Error:', err);
-        mensaje.innerText = '❌ Error al procesar recordatorios';
-        mensaje.classList.add('error');
-    }
-}
-
-function enviarRecordatorioWhatsApp(telefono, nombre, cuota, monto) {
-    const texto = encodeURIComponent(
-        `Estimado(a) ${nombre}, le recordamos que su cuota #${cuota} por S/ ${monto.toFixed(2)} ` +
-        `se encuentra pendiente de pago. Por favor acérquese a regularizar. Gracias - Capital Rise Loans`
-    );
-    window.open(`https://wa.me/51${telefono}?text=${texto}`, '_blank');
-}
-
-// ==================== ESTADO DE CUENTA PDF ====================
-async function generarEstadoCuentaPDF(clienteId, clienteNombre, clienteDoc) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    // Obtener datos del préstamo
-    const res = await fetch(`${API_URL}/prestamos/cliente/${clienteId}`);
-    if (!res.ok) {
-        mostrarToast('Error cargando datos del préstamo', 'error');
-        return;
+        } catch (err) {
+            console.error('Error:', err);
+            mensaje.innerText = '❌ Error al procesar recordatorios';
+            mensaje.classList.add('error');
+        }
     }
 
-    const data = await res.json();
-    if (!data.prestamo || !data.cuotas) {
-        mostrarToast('No hay préstamo activo para este cliente', 'warning');
-        return;
+    function enviarRecordatorioWhatsApp(telefono, nombre, cuota, monto) {
+        const texto = encodeURIComponent(
+            `Estimado(a) ${nombre}, le recordamos que su cuota #${cuota} por S/ ${monto.toFixed(2)} ` +
+            `se encuentra pendiente de pago. Por favor acérquese a regularizar. Gracias - Capital Rise Loans`
+        );
+        window.open(`https://wa.me/51${telefono}?text=${texto}`, '_blank');
     }
 
-    const margen = 15;
-    let y = 15;
+    // ==================== ESTADO DE CUENTA PDF ====================
+    async function generarEstadoCuentaPDF(clienteId, clienteNombre, clienteDoc) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
 
-    // Cabecera
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text('CAPITAL RISE LOANS S.A.C.', 105, y, { align: 'center' });
-
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'normal');
-    y += 7;
-    doc.text('R.U.C. 20612345678 | Av. Javier Prado Este 4200, San Isidro', 105, y, { align: 'center' });
-
-    y += 12;
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('ESTADO DE CUENTA', 105, y, { align: 'center' });
-
-    // Datos del cliente
-    y += 15;
-    doc.setFontSize(10);
-    doc.text('DATOS DEL CLIENTE', margen, y);
-    doc.line(margen, y + 2, 195, y + 2);
-
-    y += 10;
-    doc.setFont(undefined, 'normal');
-    doc.text(`Cliente: ${clienteNombre}`, margen, y);
-    doc.text(`Documento: ${clienteDoc}`, 120, y);
-
-    y += 7;
-    doc.text(`Monto Préstamo: S/ ${data.prestamo.monto_total}`, margen, y);
-    doc.text(`Cuotas: ${data.prestamo.cuotas}`, 120, y);
-
-    y += 7;
-    doc.text(`Fecha Emisión: ${new Date().toLocaleDateString('es-PE')}`, margen, y);
-
-    // Tabla de cuotas
-    y += 15;
-    doc.setFont(undefined, 'bold');
-    doc.text('CRONOGRAMA DE PAGOS', margen, y);
-    doc.line(margen, y + 2, 195, y + 2);
-
-    y += 10;
-    // Cabecera de tabla
-    doc.setFillColor(26, 54, 93);
-    doc.rect(margen, y - 5, 180, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
-    doc.text('N°', margen + 5, y);
-    doc.text('VENCIMIENTO', margen + 20, y);
-    doc.text('MONTO', margen + 60, y);
-    doc.text('PAGADO', margen + 95, y);
-    doc.text('SALDO', margen + 130, y);
-    doc.text('ESTADO', margen + 160, y);
-
-    doc.setTextColor(0, 0, 0);
-    y += 8;
-
-    const hoy = new Date().toISOString().split('T')[0];
-    let totalPagado = 0;
-    let totalPendiente = 0;
-
-    data.cuotas.forEach((cuota, index) => {
-        const vencida = cuota.fecha_vencimiento < hoy && !cuota.pagada;
-        const estado = cuota.pagada ? 'PAGADA' : (vencida ? 'VENCIDA' : 'PENDIENTE');
-
-        if (cuota.pagada) {
-            totalPagado += cuota.monto_cuota;
-        } else {
-            totalPendiente += cuota.saldo_pendiente;
+        // Obtener datos del préstamo
+        const res = await fetch(`${API_URL}/prestamos/cliente/${clienteId}`);
+        if (!res.ok) {
+            mostrarToast('Error cargando datos del préstamo', 'error');
+            return;
         }
 
-        if (vencida) {
-            doc.setFillColor(255, 230, 230);
-            doc.rect(margen, y - 4, 180, 7, 'F');
-        } else if (index % 2 === 0) {
-            doc.setFillColor(245, 247, 250);
-            doc.rect(margen, y - 4, 180, 7, 'F');
+        const data = await res.json();
+        if (!data.prestamo || !data.cuotas) {
+            mostrarToast('No hay préstamo activo para este cliente', 'warning');
+            return;
         }
 
-        doc.setFontSize(8);
-        doc.text(String(cuota.numero_cuota), margen + 5, y);
-        doc.text(cuota.fecha_vencimiento, margen + 20, y);
-        doc.text(`S/ ${cuota.monto_cuota.toFixed(2)}`, margen + 60, y);
-        doc.text(`S/ ${(cuota.monto_cuota - cuota.saldo_pendiente).toFixed(2)}`, margen + 95, y);
-        doc.text(`S/ ${cuota.saldo_pendiente.toFixed(2)}`, margen + 130, y);
-        doc.text(estado, margen + 160, y);
+        const margen = 15;
+        let y = 15;
+
+        // Cabecera
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text('CAPITAL RISE LOANS S.A.C.', 105, y, { align: 'center' });
+
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        y += 7;
+        doc.text('R.U.C. 20612345678 | Av. Javier Prado Este 4200, San Isidro', 105, y, { align: 'center' });
+
+        y += 12;
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('ESTADO DE CUENTA', 105, y, { align: 'center' });
+
+        // Datos del cliente
+        y += 15;
+        doc.setFontSize(10);
+        doc.text('DATOS DEL CLIENTE', margen, y);
+        doc.line(margen, y + 2, 195, y + 2);
+
+        y += 10;
+        doc.setFont(undefined, 'normal');
+        doc.text(`Cliente: ${clienteNombre}`, margen, y);
+        doc.text(`Documento: ${clienteDoc}`, 120, y);
 
         y += 7;
-    });
+        doc.text(`Monto Préstamo: S/ ${data.prestamo.monto_total}`, margen, y);
+        doc.text(`Cuotas: ${data.prestamo.cuotas}`, 120, y);
 
-    // Totales
-    y += 5;
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(10);
-    doc.line(margen, y, 195, y);
-    y += 8;
-    doc.text(`Total Pagado: S/ ${totalPagado.toFixed(2)}`, margen, y);
-    doc.text(`Total Pendiente: S/ ${totalPendiente.toFixed(2)}`, 120, y);
+        y += 7;
+        doc.text(`Fecha Emisión: ${new Date().toLocaleDateString('es-PE')}`, margen, y);
 
-    // Pie de página
-    y += 20;
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Generado el ${new Date().toLocaleString('es-PE')} - Sistema AGILE`, 105, y, { align: 'center' });
+        // Tabla de cuotas
+        y += 15;
+        doc.setFont(undefined, 'bold');
+        doc.text('CRONOGRAMA DE PAGOS', margen, y);
+        doc.line(margen, y + 2, 195, y + 2);
 
-    // Guardar
-    const nombreArchivo = `EstadoCuenta_${clienteDoc}_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(nombreArchivo);
-    mostrarToast('Estado de cuenta generado', 'success');
-}
+        y += 10;
+        // Cabecera de tabla
+        doc.setFillColor(26, 54, 93);
+        doc.rect(margen, y - 5, 180, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.text('N°', margen + 5, y);
+        doc.text('VENCIMIENTO', margen + 20, y);
+        doc.text('MONTO', margen + 60, y);
+        doc.text('PAGADO', margen + 95, y);
+        doc.text('SALDO', margen + 130, y);
+        doc.text('ESTADO', margen + 160, y);
 
-// Actualizar mostrarSeccion para incluir calendario
-const originalMostrarSeccion = mostrarSeccion;
-mostrarSeccion = function (id) {
-    // Llamar a la función original (definida antes)
-    const secciones = document.querySelectorAll('.seccion');
-    secciones.forEach(s => s.style.display = 'none');
+        doc.setTextColor(0, 0, 0);
+        y += 8;
 
-    const seccion = document.getElementById(`seccion-${id}`);
-    if (seccion) seccion.style.display = 'block';
+        const hoy = new Date().toISOString().split('T')[0];
+        let totalPagado = 0;
+        let totalPendiente = 0;
 
-    const navItems = document.querySelectorAll('.nav-item');
-    navItems.forEach(b => b.classList.remove('active'));
-    navItems.forEach(btn => {
-        if (btn.onclick && btn.onclick.toString().includes(`'${id}'`)) {
-            btn.classList.add('active');
-        }
-    });
+        data.cuotas.forEach((cuota, index) => {
+            const vencida = cuota.fecha_vencimiento < hoy && !cuota.pagada;
+            const estado = cuota.pagada ? 'PAGADA' : (vencida ? 'VENCIDA' : 'PENDIENTE');
 
-    const titles = {
-        'dashboard': 'Dashboard',
-        'clientes': 'Gestión de Clientes',
-        'prestamos': 'Gestión de Préstamos',
-        'pagos': 'Cobranza',
-        'caja': 'Control de Caja',
-        'calendario': 'Calendario de Vencimientos',
-        'empleados': 'Gestión de Empleados',
-        'config': 'Configuración'
-    };
-    const pageTitle = document.getElementById('page-title');
-    if (pageTitle) pageTitle.innerText = titles[id] || id;
+            if (cuota.pagada) {
+                totalPagado += cuota.monto_cuota;
+            } else {
+                totalPendiente += cuota.saldo_pendiente;
+            }
 
-    const headerDate = document.getElementById('header-date');
-    if (headerDate) {
-        const hoy = new Date();
-        headerDate.innerText = hoy.toLocaleDateString('es-PE', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            if (vencida) {
+                doc.setFillColor(255, 230, 230);
+                doc.rect(margen, y - 4, 180, 7, 'F');
+            } else if (index % 2 === 0) {
+                doc.setFillColor(245, 247, 250);
+                doc.rect(margen, y - 4, 180, 7, 'F');
+            }
+
+            doc.setFontSize(8);
+            doc.text(String(cuota.numero_cuota), margen + 5, y);
+            doc.text(cuota.fecha_vencimiento, margen + 20, y);
+            doc.text(`S/ ${cuota.monto_cuota.toFixed(2)}`, margen + 60, y);
+            doc.text(`S/ ${(cuota.monto_cuota - cuota.saldo_pendiente).toFixed(2)}`, margen + 95, y);
+            doc.text(`S/ ${cuota.saldo_pendiente.toFixed(2)}`, margen + 130, y);
+            doc.text(estado, margen + 160, y);
+
+            y += 7;
         });
+
+        // Totales
+        y += 5;
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(10);
+        doc.line(margen, y, 195, y);
+        y += 8;
+        doc.text(`Total Pagado: S/ ${totalPagado.toFixed(2)}`, margen, y);
+        doc.text(`Total Pendiente: S/ ${totalPendiente.toFixed(2)}`, 120, y);
+
+        // Pie de página
+        y += 20;
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Generado el ${new Date().toLocaleString('es-PE')} - Sistema AGILE`, 105, y, { align: 'center' });
+
+        // Guardar
+        const nombreArchivo = `EstadoCuenta_${clienteDoc}_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(nombreArchivo);
+        mostrarToast('Estado de cuenta generado', 'success');
     }
 
-    if (id === 'dashboard') cargarDashboard();
-    if (id === 'clientes') cargarClientes();
+    // Actualizar mostrarSeccion para incluir calendario
+    const originalMostrarSeccion = mostrarSeccion;
+    mostrarSeccion = function (id) {
+        // Llamar a la función original (definida antes)
+        const secciones = document.querySelectorAll('.seccion');
+        secciones.forEach(s => s.style.display = 'none');
 
-    if (id === 'empleados') cargarEmpleados();
-    if (id === 'config') cargarConfiguracion();
-};
+        const seccion = document.getElementById(`seccion-${id}`);
+        if (seccion) seccion.style.display = 'block';
+
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(b => b.classList.remove('active'));
+        navItems.forEach(btn => {
+            if (btn.onclick && btn.onclick.toString().includes(`'${id}'`)) {
+                btn.classList.add('active');
+            }
+        });
+
+        const titles = {
+            'dashboard': 'Dashboard',
+            'clientes': 'Gestión de Clientes',
+            'prestamos': 'Gestión de Préstamos',
+            'pagos': 'Cobranza',
+            'caja': 'Control de Caja',
+            'calendario': 'Calendario de Vencimientos',
+            'empleados': 'Gestión de Empleados',
+            'config': 'Configuración'
+        };
+        const pageTitle = document.getElementById('page-title');
+        if (pageTitle) pageTitle.innerText = titles[id] || id;
+
+        const headerDate = document.getElementById('header-date');
+        if (headerDate) {
+            // Solo mostrar en configuración
+            if (id === 'config') {
+                headerDate.style.display = 'block';
+                const hoy = new Date();
+                headerDate.innerText = hoy.toLocaleDateString('es-PE', {
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                });
+            } else {
+                headerDate.style.display = 'none';
+            }
+        }
+
+        if (id === 'dashboard') cargarDashboard();
+        if (id === 'clientes') cargarClientes();
+
+        if (id === 'empleados') cargarEmpleados();
+        if (id === 'config') cargarConfiguracion();
+    };
